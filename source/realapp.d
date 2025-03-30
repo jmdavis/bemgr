@@ -57,7 +57,58 @@ int realMain(string[] args)
 
 int doActivate(string[] args)
 {
-    assert(0);
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+    import std.stdio : writefln, writeln;
+
+    enum helpMsg =
+    "  bemgr activate <beName>\n" ~
+    "\n" ~
+    "    Sets the given boot environment as the one to boot next time that the\n" ~
+    "    computer is rebooted.";
+
+    bool help;
+
+    getopt(args, "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 3, helpMsg);
+
+    immutable beName = args[2];
+    auto poolInfo = getPoolInfo();
+    immutable dataset = buildPath(poolInfo.beParent, beName);
+
+    enforce(!isMounted(dataset), "Error: Cannot activate a mounted dataset");
+
+    immutable origin = runCmd(format!"zfs list -Ho origin %s"(esfn(dataset)),
+                              format!"Error: %s does not exist"(dataset), false);
+
+    if(origin != "-")
+        runCmd(format!"zfs promote %s"(esfn(dataset)), "Error:", true);
+
+    // These two should already be the case, since they're set when the boot
+    // environment is created, but we can't guarantee that no one has messed
+    // with them since then, so better safe than sorry. It's also why we need
+    // to check whether the dataset is mounted, since we don't want to mess
+    // with the mountpoint while the dataset is mounted (doing so can actually
+    // result in it being mounted on top of the running OS, making the OS
+    // inaccessible).
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)), "Error when setting canmount=auto", true);
+    runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)), "Error when setting mountpoint=/", true);
+
+    runCmd(format!"zpool set bootfs=%s"(esfn(dataset)), "Error:", true);
+
+    writefln("Successfully activated: %s", beName);
+
+    return 0;
 }
 
 int doCreate(string[] args)
@@ -893,4 +944,21 @@ unittest
     assert(!validName(";"));
     assert(!validName("<"));
     assert(!validName(">"));
+}
+
+bool isMounted(string dataset)
+{
+    import std.algorithm.searching : find, startsWith;
+    import std.format : format;
+    import std.string : representation, splitLines;
+
+    // Unfortunately, datasets mounted with mount -t zfs don't seem to show up
+    // as mounted in the zfs properties. So, we have to use the mount command to
+    // get that information so that we can know for sure whether it's actually
+    // mounted or not.
+
+    auto mountLines = runCmd("mount", format!"Error: Failed to whether %s was mounted"(dataset), true).splitLines();
+    immutable lineStart = format!"%s on "(dataset).representation;
+
+    return !mountLines.find!(a => a.representation.startsWith(lineStart)).empty;
 }
