@@ -21,12 +21,12 @@ int realMain(string[] args)
         "bemgr - A program for managing zfs boot environments on FreeBSD or Linux\n" ~
         "\n" ~
         "  bemgr activate <beName>\n" ~
-        "  bemgr create [-e <nonActiveBe> | -e <beName@snapshot>] <beName>\n" ~
+        "  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
         "  bemgr create <beName@snapshot>\n" ~
         "  bemgr destroy [-F] <beName@snapshot | beName@snapshot>\n" ~
         "  bemgr list [-aHso]\n" ~
         "  bemgr mount beName <mountpoint>\n" ~
-        "  bemgr rename <origBeName> <newBeName>\n" ~
+        "  bemgr rename <origBEName> <newBEName>\n" ~
         "  bemgr umount [-f <beName>]\n" ~
         "\n" ~
         "Use --help on individual commands for more information.";
@@ -89,10 +89,10 @@ int doActivate(string[] args)
     enforce(!isMounted(dataset), "Error: Cannot activate a mounted dataset");
 
     immutable origin = runCmd(format!"zfs list -Ho origin %s"(esfn(dataset)),
-                              format!"Error: %s does not exist"(dataset), false);
+                              format!"Error: %s does not exist"(dataset));
 
     if(origin != "-")
-        runCmd(format!"zfs promote %s"(esfn(dataset)), "Error:", true);
+        runCmd(format!"zfs promote %s"(esfn(dataset)));
 
     // These two should already be the case, since they're set when the boot
     // environment is created, but we can't guarantee that no one has messed
@@ -101,10 +101,10 @@ int doActivate(string[] args)
     // with the mountpoint while the dataset is mounted (doing so can actually
     // result in it being mounted on top of the running OS, making the OS
     // inaccessible).
-    runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)), "Error when setting canmount=auto", true);
-    runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)), "Error when setting mountpoint=/", true);
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
+    runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)));
 
-    runCmd(format!"zpool set bootfs=%s"(esfn(dataset)), "Error:", true);
+    runCmd(format!"zpool set bootfs=%s"(esfn(dataset)));
 
     writefln("Successfully activated: %s", beName);
 
@@ -125,7 +125,7 @@ int doCreate(string[] args)
     import std.string : representation;
 
     enum helpMsg =
-    "  bemgr create [-e <nonActiveBe> | -e <beName@snapshot>] <beName>\n" ~
+    "  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
     "\n" ~
     "    Creates a new boot environment named beName.\n" ~
     "\n" ~
@@ -166,17 +166,17 @@ int doCreate(string[] args)
     if(origin.empty)
     {
         origin = format!"%s@%s"(poolInfo.rootFS, (cast(DateTime)Clock.currTime()).toISOExtString());
-        runCmd(format!"zfs snap %s"(esfn(origin)), "Error:", true);
+        runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else if(!origin.representation.canFind(ubyte('@')))
     {
         origin = format!"%s@%s"(origin, (cast(DateTime)Clock.currTime()).toISOExtString());
-        runCmd(format!"zfs snap %s"(esfn(origin)), "Error:", true);
+        runCmd(format!"zfs snap %s"(esfn(origin)));
     }
 
-    runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)), "Error:", true);
-    runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)), "Error:", true);
-    runCmd(format!"zfs set mountpoint=/ %s"(esfn(clone)), "Error:", true);
+    runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)));
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)));
+    runCmd(format!"zfs set mountpoint=/ %s"(esfn(clone)));
 
     return 0;
 }
@@ -317,7 +317,40 @@ int doMount(string[] args)
 
 int doRename(string[] args)
 {
-    assert(0);
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+    import std.stdio : writeln;
+
+    enum helpMsg =
+    "  bemgr rename <origBEName> <newBEName>\n" ~
+    "\n" ~
+    "    Renames the given boot environment.";
+
+    bool help;
+
+    getopt(args, "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 4, helpMsg);
+
+    immutable origBE = args[2];
+    immutable newBE = args[3];
+
+    auto poolInfo = getPoolInfo();
+    immutable source = buildPath(poolInfo.beParent, origBE);
+    immutable target = buildPath(poolInfo.beParent, newBE);
+
+    runCmd(format!"zfs rename %s %s"(esfn(source), esfn(target)));
+
+    return 0;
 }
 
 int doUmount(string[] args)
@@ -415,7 +448,7 @@ struct DSInfo
     }
 }
 
-string runCmd(string cmd, lazy string errorMsg, bool appendErrorOutput)
+string runCmd(string cmd)
 {
     import std.exception : enforce;
     import std.format : format;
@@ -423,7 +456,19 @@ string runCmd(string cmd, lazy string errorMsg, bool appendErrorOutput)
     import std.string : strip;
 
     immutable result = executeShell(cmd);
-    enforce(result.status == 0, appendErrorOutput ? format!"%s\n%s"(errorMsg, result.output) : errorMsg);
+    enforce(result.status == 0, result.output);
+    return result.output.strip();
+}
+
+string runCmd(string cmd, lazy string errorMsg)
+{
+    import std.exception : enforce;
+    import std.format : format;
+    import std.process : executeShell;
+    import std.string : strip;
+
+    immutable result = executeShell(cmd);
+    enforce(result.status == 0, errorMsg);
     return result.output.strip();
 }
 
@@ -434,7 +479,7 @@ PoolInfo getPoolInfo()
     import std.format : format;
     import std.process : escapeShellFileName;
 
-    immutable rootFS = runCmd(`mount | awk '/ \/ / {print $1}'`, "Failed to get the root filesystem", false);
+    immutable rootFS = runCmd(`mount | awk '/ \/ / {print $1}'`, "Failed to get the root filesystem");
     enforce(!rootFS.startsWith("/dev"), "Error: This system does not boot from a ZFS pool");
 
     auto found = rootFS.find('/');
@@ -442,7 +487,7 @@ PoolInfo getPoolInfo()
     immutable pool = rootFS[0 .. rootFS.length - found.length];
 
     immutable bootFS = runCmd(format!`zpool get -H -o value bootfs %s`(escapeShellFileName(pool)),
-                              format!"Error: ZFS boot pool '%s' has unset 'bootfs' property"(pool), false);
+                              format!"Error: ZFS boot pool '%s' has unset 'bootfs' property"(pool));
 
     return PoolInfo(pool, rootFS, bootFS);
 }
@@ -460,7 +505,7 @@ BEInfo[] getBEInfos(PoolInfo poolInfo)
     import std.string : representation, splitLines;
 
     immutable result = runCmd(format!(DSInfo.listCmd)(escapeShellFileName(poolInfo.beParent)),
-                              "Error: Failed to get the list of boot environments", false);
+                              "Error: Failed to get the list of boot environments");
     auto dsInfos = result.splitLines().map!DSInfo().filter!(a => a.name != poolInfo.beParent)().array();
 
     BEInfo[] retval;
@@ -957,7 +1002,7 @@ bool isMounted(string dataset)
     // get that information so that we can know for sure whether it's actually
     // mounted or not.
 
-    auto mountLines = runCmd("mount", format!"Error: Failed to whether %s was mounted"(dataset), true).splitLines();
+    auto mountLines = runCmd("mount", format!"Error: Failed to determine whether %s was mounted"(dataset)).splitLines();
     immutable lineStart = format!"%s on "(dataset).representation;
 
     return !mountLines.find!(a => a.representation.startsWith(lineStart)).empty;
