@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/bemgr
+bemgr.so
+bemgr.dylib
+bemgr.dll
+bemgr.a
+bemgr.lib
+bemgr-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

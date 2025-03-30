@@ -1,0 +1,7 @@
+{
+    "name": "bemgr",
+    "description": "A program to manage ZFS boot environments on FreeBSD and Linux.",
+    "copyright": "Copyright © 2025, Jonathan M Davis",
+    "authors": [ "Jonathan M Davis" ],
+    "license": "BSL-1.0"
+}
