@@ -105,7 +105,6 @@ int doCreate(string[] args)
                    "    Underscore: _\n" ~
                    "    Period: .\n" ~
                    "    Colon: :\n" ~
-                   "    Space: ' '\n" ~
                    "    Hypthen: -";
         enforce(validName(newBE), format!fmt((newBE)));
     }
@@ -855,7 +854,6 @@ bool validName(string beName)
             case '_':
             case '.':
             case ':':
-            case ' ':
             case '-': continue;
             default: return false;
         }
@@ -870,8 +868,9 @@ unittest
 
     assert(validName(digits));
     assert(validName(letters));
-    assert(validName("_.: -"));
+    assert(validName("_.:-"));
 
+    assert(!validName(" "));
     assert(!validName("+"));
     assert(!validName("="));
     assert(!validName("!"));
