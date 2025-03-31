@@ -66,53 +66,15 @@ enum Units : BigInt
     zettabytes = BigInt("1180591620717411303424")
 }
 
-BigInt parseSizeAsBytes(string size)
+BigInt parseSize(string size, string fieldName)
 {
-    import std.algorithm.searching : all, find;
-    import std.ascii : isDigit;
-    import std.conv : to;
-    import std.exception : enforce;
-    import std.math : pow;
+    import std.bigint : BigInt;
     import std.format : format;
-    import std.range : take;
 
-    if(size == "-")
-        return BigInt();
-
-    BigInt mul;
-
-    switch(size[$ - 1])
-    {
-        case 'B': mul = Units.bytes; break;
-        case 'K': mul = Units.kilobytes; break;
-        case 'M': mul = Units.megabytes; break;
-        case 'G': mul = Units.gigabytes; break;
-        case 'T': mul = Units.terabytes; break;
-        case 'P': mul = Units.petabytes; break;
-        case 'E': mul = Units.exabytes; break;
-        case 'Z': mul = Units.zettabytes; break;
-        default: throw new Exception(format!"Error: Unexpected format for size of dataset or snapshot: %s"(size));
-    }
-
-    auto num = size[0 .. $ - 1];
-    auto found = num.find(".");
-    auto whole = num[0 .. num.length - found.length];
-    auto decimal = found.empty ? "" : found[1 .. $];
-
-    enforce(!whole.empty &&
-            whole.all!isDigit() &&
-            (found.empty || (!decimal.empty && decimal.all!isDigit())),
-            format!"Error: Unexpected format for size of dataset or snapshot: %s"(size));
-
-    auto retval = BigInt(whole) * mul;
-
-    if(decimal.empty)
-        return retval;
-
-    if(decimal.length == 1)
-        return retval + mul * to!ubyte(decimal.take(1)) / 10;
-
-    return retval + mul * to!ubyte(decimal.take(2)) / 100;
+    try
+        return BigInt(size);
+    catch(Exception)
+        throw new Exception(format!`Error: The %s field of zfs list has an unexpected format: %s`(fieldName, size));
 }
 
 unittest
@@ -120,96 +82,14 @@ unittest
     import std.exception : assertThrown;
     import std.math : pow;
 
-    assert(parseSizeAsBytes("-") == 0);
+    assert(parseSize("0", "") == BigInt(0));
+    assert(parseSize("123", "") == BigInt(123));
+    assert(parseSize("123456789", "") == BigInt(123456789));
+    assert(parseSize("123456789012345678901234567890", "") == BigInt("123456789012345678901234567890"));
 
-    assert(parseSizeAsBytes("0B") == 0);
-    assert(parseSizeAsBytes("0K") == 0);
-    assert(parseSizeAsBytes("0M") == 0);
-    assert(parseSizeAsBytes("0G") == 0);
-    assert(parseSizeAsBytes("0T") == 0);
-    assert(parseSizeAsBytes("0P") == 0);
-    assert(parseSizeAsBytes("0E") == 0);
-    assert(parseSizeAsBytes("0Z") == 0);
-
-    assert(parseSizeAsBytes("0.0B") == 0);
-    assert(parseSizeAsBytes("0.0K") == 0);
-    assert(parseSizeAsBytes("0.0M") == 0);
-    assert(parseSizeAsBytes("0.0G") == 0);
-    assert(parseSizeAsBytes("0.0T") == 0);
-    assert(parseSizeAsBytes("0.0P") == 0);
-    assert(parseSizeAsBytes("0.0E") == 0);
-    assert(parseSizeAsBytes("0.0Z") == 0);
-
-    assert(parseSizeAsBytes("0.00123456789B") == 0);
-    assert(parseSizeAsBytes("0.00123456789K") == 0);
-    assert(parseSizeAsBytes("0.00123456789M") == 0);
-    assert(parseSizeAsBytes("0.00123456789G") == 0);
-    assert(parseSizeAsBytes("0.00123456789T") == 0);
-    assert(parseSizeAsBytes("0.00123456789P") == 0);
-    assert(parseSizeAsBytes("0.00123456789E") == 0);
-    assert(parseSizeAsBytes("0.00123456789Z") == 0);
-
-    assert(parseSizeAsBytes("0.0123456789B") == 0);
-    assert(parseSizeAsBytes("0.0123456789K") == 10);
-    assert(parseSizeAsBytes("0.0123456789M") == 10485UL);
-    assert(parseSizeAsBytes("0.0123456789G") == 10737418UL);
-    assert(parseSizeAsBytes("0.0123456789T") == 10995116277UL);
-    assert(parseSizeAsBytes("0.0123456789P") == 11258999068426UL);
-    assert(parseSizeAsBytes("0.0123456789E") == 11529215046068469UL);
-    assert(parseSizeAsBytes("0.0123456789Z") == 11805916207174113034UL);
-
-    assert(parseSizeAsBytes("0.019B") == 0);
-    assert(parseSizeAsBytes("0.019K") == 10);
-    assert(parseSizeAsBytes("0.019M") == 10485UL);
-    assert(parseSizeAsBytes("0.019G") == 10737418UL);
-    assert(parseSizeAsBytes("0.019T") == 10995116277UL);
-    assert(parseSizeAsBytes("0.019P") == 11258999068426UL);
-    assert(parseSizeAsBytes("0.019E") == 11529215046068469UL);
-    assert(parseSizeAsBytes("0.019Z") == 11805916207174113034UL);
-
-    assert(parseSizeAsBytes("1.2B") == 1);
-    assert(parseSizeAsBytes("1.2K") == 1228UL);
-    assert(parseSizeAsBytes("1.2M") == 1258291UL);
-    assert(parseSizeAsBytes("1.2G") == 1288490188UL);
-    assert(parseSizeAsBytes("1.2T") == 1319413953331UL);
-    assert(parseSizeAsBytes("1.2P") == 1351079888211148UL);
-    assert(parseSizeAsBytes("1.2E") == 1383505805528216371UL);
-    assert(parseSizeAsBytes("1.2Z") == BigInt("1416709944860893564108"));
-
-    assert(parseSizeAsBytes("1.27B") == 1);
-    assert(parseSizeAsBytes("1.27K") == 1300UL);
-    assert(parseSizeAsBytes("1.27M") == 1331691UL);
-    assert(parseSizeAsBytes("1.27G") == 1363652116UL);
-    assert(parseSizeAsBytes("1.27T") == 1396379767275UL);
-    assert(parseSizeAsBytes("1.27P") == 1429892881690132UL);
-    assert(parseSizeAsBytes("1.27E") == 1464210310850695659UL);
-    assert(parseSizeAsBytes("1.27Z") == BigInt("1499351358311112355348"));
-
-    assert(parseSizeAsBytes("123456789.0B") == BigInt("123456789"));
-    assert(parseSizeAsBytes("123456789.0K") == BigInt("126419751936"));
-    assert(parseSizeAsBytes("123456789.0M") == BigInt("129453825982464"));
-    assert(parseSizeAsBytes("123456789.0G") == BigInt("132560717806043136"));
-    assert(parseSizeAsBytes("123456789.0T") == BigInt("135742175033388171264"));
-    assert(parseSizeAsBytes("123456789.0P") == BigInt("138999987234189487374336"));
-    assert(parseSizeAsBytes("123456789.0E") == BigInt("142335986927810035071320064"));
-    assert(parseSizeAsBytes("123456789.0Z") == BigInt("145752050614077475913031745536"));
-
-    assert(parseSizeAsBytes("123456789.7B") == BigInt("123456789"));
-    assert(parseSizeAsBytes("123456789.7K") == BigInt("126419752652"));
-    assert(parseSizeAsBytes("123456789.7M") == BigInt("129453826716467"));
-    assert(parseSizeAsBytes("123456789.7G") == BigInt("132560718557662412"));
-    assert(parseSizeAsBytes("123456789.7T") == BigInt("135742175803046310707"));
-    assert(parseSizeAsBytes("123456789.7P") == BigInt("138999988022319422164172"));
-    assert(parseSizeAsBytes("123456789.7E") == BigInt("142335987734855088296112947"));
-    assert(parseSizeAsBytes("123456789.7Z") == BigInt("145752051440491610415219657932"));
-
-    assertThrown(parseSizeAsBytes("0.0"));
-    assertThrown(parseSizeAsBytes("B"));
-    assertThrown(parseSizeAsBytes(".0B"));
-    assertThrown(parseSizeAsBytes("0.B"));
-    assertThrown(parseSizeAsBytes("0.0W"));
-    assertThrown(parseSizeAsBytes("0.0 B"));
-    assertThrown(parseSizeAsBytes("0.0B "));
+    assertThrown(parseSize("12M", ""));
+    assertThrown(parseSize("123 ", ""));
+    assertThrown(parseSize(" 123", ""));
 }
 
 string bytesToSize(BigInt bytes)
@@ -296,145 +176,16 @@ unittest
     assert(bytesToSize(BigInt(pow(1024UL, 6)) * BigInt(1024UL) * 8 - 1) == "7.99Z");
 }
 
-DateTime parseDate(string year, string month, string day, string time)
+DateTime parseDate(string str)
 {
-    import std.algorithm.searching : find;
     import std.conv : ConvException, to;
-    import std.datetime : DateTimeException, TimeOfDay;
-    import std.exception : enforce;
+    import std.datetime.systime : SysTime;
     import std.format : format;
-    import std.range : takeOne;
 
     try
-    {
-        DateTime retval;
-        retval.year = to!int(year);
-        retval.month = parseMonth(month);
-        retval.day = to!int(day);
-        retval.timeOfDay = TimeOfDay.fromISOExtString(format!"%s%s:00"(time.length == 4 ? "0" : "", time));
-
-        return retval;
-    }
+        return cast(DateTime)SysTime.fromUnixTime(to!ulong(str));
     catch(ConvException)
-    {
-        enum fmt = "Error: Unexpected format for creation date of dataset or snapshot: %s %s %s %s";
-        throw new Exception(format!fmt(month, day, time, year));
-    }
-    catch(DateTimeException)
-    {
-        enum fmt = "Error: Creation date/time of dataset or snapshot is an invalid date/time: %s %s %s %s";
-        throw new Exception(format!fmt(month, day, time, year));
-    }
-}
-
-unittest
-{
-    import core.exception : AssertError;
-    import std.exception : assertThrown, enforce;
-
-    void test(string year, string month, string day, string time, DateTime expected, size_t line = __LINE__)
-    {
-        enforce!AssertError(parseDate(year, month, day, time) == expected, "unittest failure", __FILE__, line);
-    }
-
-    test("2023", "Oct", "14", "23:33", DateTime(2023, 10, 14, 23, 33));
-    test("2024", "Sep", "23", "6:06", DateTime(2024, 9, 23, 6, 6));
-    test("2025", "Feb", "9", "9:48", DateTime(2025, 2, 9, 9, 48));
-    test("2025", "Mar", "19", "05:07", DateTime(2025, 3, 19, 5, 7));
-
-    assertThrown(parseDate("2025", "Feb", "29", "9:48"));
-    assertThrown(parseDate("2022", "dec", "29", "9:48"));
-    assertThrown(parseDate("Feb", "Feb", "9", "9:48"));
-    assertThrown(parseDate("2025", "2025", "9", "9:48"));
-    assertThrown(parseDate("2025", "Feb", "Feb", "9:48"));
-    assertThrown(parseDate("2025", "Feb", "9", "Feb"));
-    assertThrown(parseDate("2025", "Feb", "9", "29:48"));
-    assertThrown(parseDate("2025", "Feb", "9", ":48"));
-    assertThrown(parseDate("2025", "Feb", "9", ":489"));
-}
-
-Month parseMonth(string month)
-{
-    import std.conv : ConvException;
-    import std.format : format;
-    import std.string : capitalize;
-
-    switch(month)
-    {
-        foreach(e; __traits(allMembers, Month))
-            mixin(format!`case "%s": return Month.%s;`(e.capitalize(), e));
-        default: throw new ConvException("Failed to convert month string to a Month");
-    }
-}
-
-unittest
-{
-    import std.exception : assertThrown;
-
-    assert(parseMonth("Jan") == Month.jan);
-    assert(parseMonth("Feb") == Month.feb);
-    assert(parseMonth("Mar") == Month.mar);
-    assert(parseMonth("Apr") == Month.apr);
-    assert(parseMonth("May") == Month.may);
-    assert(parseMonth("Jun") == Month.jun);
-    assert(parseMonth("Jul") == Month.jul);
-    assert(parseMonth("Aug") == Month.aug);
-    assert(parseMonth("Sep") == Month.sep);
-    assert(parseMonth("Oct") == Month.oct);
-    assert(parseMonth("Nov") == Month.nov);
-    assert(parseMonth("Dec") == Month.dec);
-
-    assertThrown(parseMonth("jan"));
-    assertThrown(parseMonth("feb"));
-    assertThrown(parseMonth("mar"));
-    assertThrown(parseMonth("apr"));
-    assertThrown(parseMonth("may"));
-    assertThrown(parseMonth("jun"));
-    assertThrown(parseMonth("jul"));
-    assertThrown(parseMonth("aug"));
-    assertThrown(parseMonth("sep"));
-    assertThrown(parseMonth("oct"));
-    assertThrown(parseMonth("nov"));
-    assertThrown(parseMonth("dec"));
-
-    assertThrown(parseMonth("jAn"));
-    assertThrown(parseMonth("fEb"));
-    assertThrown(parseMonth("mAr"));
-    assertThrown(parseMonth("aPr"));
-    assertThrown(parseMonth("mAy"));
-    assertThrown(parseMonth("jUn"));
-    assertThrown(parseMonth("jUl"));
-    assertThrown(parseMonth("aUg"));
-    assertThrown(parseMonth("sEp"));
-    assertThrown(parseMonth("oCt"));
-    assertThrown(parseMonth("nOv"));
-    assertThrown(parseMonth("dEc"));
-
-    assertThrown(parseMonth("jaN"));
-    assertThrown(parseMonth("feB"));
-    assertThrown(parseMonth("maR"));
-    assertThrown(parseMonth("apR"));
-    assertThrown(parseMonth("maY"));
-    assertThrown(parseMonth("juN"));
-    assertThrown(parseMonth("juL"));
-    assertThrown(parseMonth("auG"));
-    assertThrown(parseMonth("seP"));
-    assertThrown(parseMonth("ocT"));
-    assertThrown(parseMonth("noV"));
-    assertThrown(parseMonth("deC"));
-
-    assertThrown(parseMonth("JAN"));
-    assertThrown(parseMonth("FEB"));
-    assertThrown(parseMonth("MAR"));
-    assertThrown(parseMonth("APR"));
-    assertThrown(parseMonth("MAY"));
-    assertThrown(parseMonth("JUN"));
-    assertThrown(parseMonth("JUL"));
-    assertThrown(parseMonth("AUG"));
-    assertThrown(parseMonth("SEP"));
-    assertThrown(parseMonth("OCT"));
-    assertThrown(parseMonth("NOV"));
-    assertThrown(parseMonth("DEC"));
+        throw new Exception(format!`Error: The creation field of zfs list has an unexpected format: %s`(str));
 }
 
 bool isMounted(string dataset)

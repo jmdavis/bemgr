@@ -150,18 +150,16 @@ struct DSInfo
     this(string line)
     {
         import std.conv : ConvException, to;
-        import std.datetime.systime : SysTime;
         import std.exception : enforce;
         import std.string : indexOf, split;
+
+        import bemgr.util : parseDate;
 
         auto parts = line.split();
         enforce(parts.length == 3,
                 `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
         this.name = parts[0];
-        try
-            this.creationTime = cast(DateTime)SysTime.fromUnixTime(to!ulong(parts[1]));
-        catch(ConvException)
-            throw new Exception(`Error: The format from "zfs list" seems to have changed from what bemgr expects`);
+        this.creationTime = parseDate(parts[1]);
         this.originName = parts[2];
 
         immutable at = name.indexOf('@');

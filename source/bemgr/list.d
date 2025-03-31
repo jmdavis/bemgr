@@ -70,7 +70,7 @@ int doList(string[] args)
 
         string creation;
         with(beInfo.dataset.creationTime)
-            creation = format!"%s-%02d-%02d %02d:%02d"(year, month, day, hour, minute);
+            creation = format!"%s-%02d-%02d %02d:%02d:%02d"(year, month, day, hour, minute, second);
 
         rows ~= [beInfo.name, active, mountpoint, space, referenced, creation, beInfo.dataset.originName];
     }
@@ -177,10 +177,8 @@ struct DSInfo
     DSInfo* originInfo;
     bool snapshot;
 
-    enum listCmd = `zfs list -H -t filesystem,snapshot,volume ` ~
-                   // These are the fields parsed in the constructor, with
-                   // creation being divided up further, because it has spaces
-                   // between the parts of the date/time.
+    enum listCmd = `zfs list -Hpt filesystem,snapshot,volume ` ~
+                   // These are the fields parsed in the constructor
                    `-o name,mountpoint,mounted,used,usedds,usedsnap,usedrefreserv,refer,creation,origin ` ~
                    `-r %s`;
 
@@ -190,27 +188,23 @@ struct DSInfo
         import std.exception : enforce;
         import std.string : representation, split;
 
-        import bemgr.util : parseDate, parseSizeAsBytes;
+        import bemgr.util : parseDate, parseSize;
 
         auto parts = line.split();
-        enforce(parts.length == 14,
+        enforce(parts.length == 10,
                 `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
+
         this.name = parts[0];
         this.mountpoint = parts[1];
         this.mounted = parts[2] == "yes";
-        this.used = parseSizeAsBytes(parts[3]);
-        this.usedByDataset = parseSizeAsBytes(parts[4]);
-        this.usedBySnapshots = parseSizeAsBytes(parts[5]);
-        this.usedByRefReservation = parseSizeAsBytes(parts[6]);
-        this.referenced = parseSizeAsBytes(parts[7]);
-        //immutable dow = parts[8]; // ignored, since it's just duplicate info
-        immutable month = parts[9];
-        immutable day = parts[10];
-        immutable time = parts[11];
-        immutable year = parts[12];
-        this.originName = parts[13];
+        this.used = parseSize(parts[3], "used");
+        this.usedByDataset = parseSize(parts[4], "usedds");
+        this.usedBySnapshots = parseSize(parts[5], "usedsnap");
+        this.usedByRefReservation = parseSize(parts[6], "usedrefreserv");
+        this.referenced = parseSize(parts[7], "refer");
+        this.creationTime = parseDate(parts[8]);
+        this.originName = parts[9];
 
-        this.creationTime = parseDate(year, month, day, time);
         this.snapshot = name.representation.canFind(ubyte('@'));
     }
 }
