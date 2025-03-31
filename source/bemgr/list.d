@@ -246,7 +246,7 @@ BEInfo[] getBEInfos(PoolInfo poolInfo)
 
         foreach(other; dsInfos)
         {
-            if(other.name.representation.startsWith(chain(dsInfo.name, only(ubyte('@')))))
+            if(other.name.representation.startsWith(chain(dsInfo.name.representation, only(ubyte('@')))))
                 beInfo.snapshots ~= other;
         }
 

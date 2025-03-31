@@ -31,6 +31,7 @@ Use --help on individual commands for more information.`;
     import std.stdio : stderr, writeln;
 
     import bemgr.create : doCreate;
+    import bemgr.destroy : doDestroy;
     import bemgr.list : doList;
 
     try
@@ -113,11 +114,6 @@ int doActivate(string[] args)
     writefln("Successfully activated: %s", beName);
 
     return 0;
-}
-
-int doDestroy(string[] args)
-{
-    assert(0);
 }
 
 int doMount(string[] args)
