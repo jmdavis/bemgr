@@ -13,23 +13,24 @@ import std.range.primitives;
 
 int realMain(string[] args)
 {
+    immutable helpMsg =
+`bemgr - A program for managing zfs boot environments on FreeBSD or Linux
+
+  bemgr activate <beName>\n" ~
+  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
+  bemgr create <beName@snapshot>\n" ~
+  bemgr destroy [-F] [-n] <beName>\n" ~
+  bemgr destroy [-F] [-n] <beName@snapshot>\n" ~
+  bemgr list [-H] [--origin | -o]\n" ~
+  bemgr mount <beName> <mountpoint>\n" ~
+  bemgr rename <origBEName> <newBEName>\n" ~
+  bemgr umount [-f <beName>]\n" ~
+
+Use --help on individual commands for more information.`;
+
     import std.exception : enforce;
     import std.getopt : GetOptException;
     import std.stdio : stderr, writeln;
-
-    immutable helpMsg =
-        "bemgr - A program for managing zfs boot environments on FreeBSD or Linux\n" ~
-        "\n" ~
-        "  bemgr activate <beName>\n" ~
-        "  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
-        "  bemgr create <beName@snapshot>\n" ~
-        "  bemgr destroy [-F] <beName@snapshot | beName@snapshot>\n" ~
-        "  bemgr list [-aHso]\n" ~
-        "  bemgr mount beName <mountpoint>\n" ~
-        "  bemgr rename <origBEName> <newBEName>\n" ~
-        "  bemgr umount [-f <beName>]\n" ~
-        "\n" ~
-        "Use --help on individual commands for more information.";
 
     try
     {
@@ -57,18 +58,18 @@ int realMain(string[] args)
 
 int doActivate(string[] args)
 {
+    enum helpMsg =
+`  bemgr activate <beName>
+
+    Sets the given boot environment as the one to boot next time that the
+    computer is rebooted.`;
+
     import std.exception : enforce;
     import std.format : format;
     import std.getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
-
-    enum helpMsg =
-    "  bemgr activate <beName>\n" ~
-    "\n" ~
-    "    Sets the given boot environment as the one to boot next time that the\n" ~
-    "    computer is rebooted.";
 
     bool help;
 
@@ -113,6 +114,14 @@ int doActivate(string[] args)
 
 int doCreate(string[] args)
 {
+    enum helpMsg =
+`bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>
+
+  Creates a new boot environment named beName.
+
+  -e specifies the boot environment or snapshot of a boot environment to clone
+     the new boot environment from.`;
+
     import std.algorithm.searching : canFind;
     import std.datetime.date : DateTime;
     import std.datetime.systime : Clock;
@@ -123,14 +132,6 @@ int doCreate(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
     import std.string : representation;
-
-    enum helpMsg =
-    "  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
-    "\n" ~
-    "    Creates a new boot environment named beName.\n" ~
-    "\n" ~
-    "    -e specifies the boot environment or snapshot of a boot environment to \n" ~
-    "       clone the new boot environment from.";
 
     string origin;
     bool help;
@@ -149,14 +150,16 @@ int doCreate(string[] args)
     immutable newBE = args[2];
 
     {
-        enum fmt = `Error: Cannot create a boot environment with the name "%s"` ~ "\n" ~
-                   "The characters allowed in boot environment names are:\n" ~
-                   "    ASCII letters: a-z A-Z" ~
-                   "    ASCII Digits: 0-9" ~
-                   "    Underscore: _\n" ~
-                   "    Period: .\n" ~
-                   "    Colon: :\n" ~
-                   "    Hypthen: -";
+        enum fmt =
+`Error: Cannot create a boot environment with the name "%s"
+The characters allowed in boot environment names are:
+    ASCII letters: a-z A-Z
+    ASCII Digits: 0-9
+    Underscore: _
+    Period: .
+    Colon: :
+    Hypthen: -`;
+
         enforce(validName(newBE), format!fmt((newBE)));
     }
 
@@ -188,20 +191,19 @@ int doDestroy(string[] args)
 
 int doList(string[] args)
 {
+    enum helpMsg =
+`bemgr list [-Ho]
+  Display all boot environments. The "Active" field indicates whether the
+  boot environment is active now (N); active on reboot ("R"); or both ("NR").
+
+  -H will print headers, and it separates fields by a single tab instead of
+     arbitrary whitespace. Use for scripting.
+
+  --origin | -o will print out the origin snapshot for each boot environment.`;
+
     import std.format : format;
     import std.getopt : getopt;
     import std.stdio : write, writeln;
-
-    enum helpMsg =
-    "bemgr list [-Ho]\n" ~
-    `    Display all boot environments. The "Active" field indicates whether the ` ~ "\n" ~
-    `    boot environment is active now (N); active on reboot ("R"); or both ("NR").` ~ "\n" ~
-    "\n" ~
-    "    -H will print headers, and it separates fields by a single tab instead of \n" ~
-    "       arbitrary whitespace. Use for scripting.\n" ~
-    "\n" ~
-    "    --origin|-o will print out the origin snapshot for each boot environment.";
-
 
     bool noHeaders;
     bool printOrigin;
@@ -246,7 +248,7 @@ int doList(string[] args)
         with(beInfo.dataset.creationTime)
             creation = format!"%s-%02d-%02d %02d:%02d"(year, month, day, hour, minute);
 
-        rows ~= [beInfo.name, active, mountpoint, space, referenced, creation, originInfo ? originInfo.name : "-"];
+        rows ~= [beInfo.name, active, mountpoint, space, referenced, creation, beInfo.dataset.originName];
     }
 
     if(!noHeaders)
@@ -317,17 +319,17 @@ int doMount(string[] args)
 
 int doRename(string[] args)
 {
+    enum helpMsg =
+`bemgr rename <origBEName> <newBEName>
+
+  Renames the given boot environment.`;
+
     import std.exception : enforce;
     import std.format : format;
     import std.getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
-
-    enum helpMsg =
-    "  bemgr rename <origBEName> <newBEName>\n" ~
-    "\n" ~
-    "    Renames the given boot environment.";
 
     bool help;
 
