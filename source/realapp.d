@@ -47,7 +47,7 @@ Use --help on individual commands for more information.`;
             case "create": return doCreate(args);
             case "destroy": return doDestroy(args);
             case "export": return doExport(args);
-            case "import": return doExport(args);
+            case "import": return doImport(args);
             case "list": return doList(args);
             case "mount": return doMount(args);
             case "rename": return doRename(args);
@@ -198,7 +198,66 @@ int doExport(string[] args)
 
 int doImport(string[] args)
 {
-    assert(0);
+    enum helpMsg =
+`bemgr import <targetBE>
+
+  Takes input from stdin to create the given boot environment and creates
+  the given boot environment from it.
+
+  -v displays verbose output
+`;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt : getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
+    import std.stdio : stderr, writeln;
+
+    import bemgr.util : getPoolInfo, runCmd;
+
+    bool verbose;
+    bool help;
+
+    getopt(args, "|v", &verbose,
+                 "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 3, helpMsg);
+
+    immutable beName = args[2];
+
+    auto poolInfo = getPoolInfo();
+    immutable dataset = buildPath(poolInfo.beParent, beName);
+
+    enforce(executeShell(format!`zfs list %s`(esfn(dataset))).status != 0,
+            format!"Error: %s already exists"(dataset));
+
+    enforce(wait(spawnShell(format!`zfs recv%s -u %s`(verbose ? " -v" : "", esfn(dataset)))) == 0,
+            "Error: zfs recv failed");
+
+    {
+        immutable cmd = format!"zfs set canmount=noauto %s"(esfn(dataset));
+        if(verbose)
+            stderr.writefln("\n%s", cmd);
+        runCmd(cmd);
+    }
+
+    {
+        immutable cmd = format!"zfs set mountpoint=/ %s"(esfn(dataset));
+        if(verbose)
+            stderr.writefln("\n%s", cmd);
+        runCmd(cmd);
+    }
+
+    if(verbose)
+        stderr.writeln("\nImport complete");
+
+    return 0;
 }
 
 int doMount(string[] args)
