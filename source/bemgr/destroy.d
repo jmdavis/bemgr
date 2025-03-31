@@ -189,6 +189,7 @@ DestroyInfo getDestroyInfo(PoolInfo poolInfo, string beName)
                               "Error: Failed to get the list of datasets and snapshots");
     immutable datasetName = buildPath(poolInfo.beParent, beName);
     immutable snapStart = datasetName ~ "@";
+    immutable childStart = datasetName ~ "/";
 
     DSInfo dataset;
     DSInfo[] childSnapshots;
@@ -198,8 +199,13 @@ DestroyInfo getDestroyInfo(PoolInfo poolInfo, string beName)
     {
         if(e.name == datasetName)
             dataset = e;
-        else if(e.parent == datasetName)
-            childSnapshots ~= e;
+        else if(!e.parent.empty)
+        {
+            if(e.parent == datasetName)
+                childSnapshots ~= e;
+        }
+        else if(e.name.representation.startsWith(childStart.representation))
+            throw new Exception(format!"Error: %s has child datasets"(datasetName));
         else if(!e.originName.empty)
             clones ~= e;
     }
