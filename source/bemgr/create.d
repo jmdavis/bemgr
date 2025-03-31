@@ -12,7 +12,7 @@ import std.range.primitives;
 int doCreate(string[] args)
 {
     enum helpMsg =
-`bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>
+`bemgr create [-e <beName> | -e <beName@snapshot>] <beName>
 
   Creates a new boot environment named beName.
 

@@ -14,15 +14,16 @@ int realMain(string[] args)
     immutable helpMsg =
 `bemgr - A program for managing zfs boot environments on FreeBSD or Linux
 
-  bemgr activate <beName>\n" ~
-  bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
-  bemgr create <beName@snapshot>\n" ~
-  bemgr destroy [-n] <beName>\n" ~
-  bemgr destroy [-n] <beName@snapshot>\n" ~
-  bemgr list [-H] [--origin | -o]\n" ~
-  bemgr mount <beName> <mountpoint>\n" ~
-  bemgr rename <origBEName> <newBEName>\n" ~
-  bemgr umount [-f <beName>]\n" ~
+  bemgr activate <beName>
+  bemgr create [-e <beName> | -e <beName@snapshot>] <beName>
+  bemgr create <beName@snapshot>
+  bemgr destroy [-n] <beName>
+  bemgr destroy [-n] <beName@snapshot>
+  bemgr list [-H] [--origin | -o]
+  bemgr mount <beName> <mountpoint>
+  bemgr rename <origBEName> <newBEName>
+  bemgr umount <beName>
+  bemgr unmount <beName>
 
 Use --help on individual commands for more information.`;
 
@@ -118,7 +119,46 @@ int doActivate(string[] args)
 
 int doMount(string[] args)
 {
-    assert(0);
+    enum helpMsg =
+`bemgr mount <beName> <mountpoint>
+
+  Mounts the given boot environment at the given mountpoint.
+  It has no effect on the mountpoint property of the dataset.
+`;
+    import std.exception : enforce;
+    import std.file : exists, isDir;
+    import std.format : format;
+    import std.getopt : getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+    import std.stdio : writeln;
+
+    import bemgr.util : getPoolInfo, runCmd;
+
+    bool help;
+
+    getopt(args, "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 4, helpMsg);
+
+    immutable beName = args[2];
+    immutable mountpoint = args[3];
+
+    enforce(mountpoint.exists, format!"Error: %s does not exist"(mountpoint));
+    enforce(mountpoint.isDir, format!"Error: %s is not a directory"(mountpoint));
+
+    auto poolInfo = getPoolInfo();
+    immutable dataset = buildPath(poolInfo.beParent, beName);
+
+    runCmd(format!"mount -t zfs %s %s"(esfn(dataset), esfn(mountpoint)));
+
+    return 0;
 }
 
 int doRename(string[] args)
@@ -163,5 +203,43 @@ int doRename(string[] args)
 
 int doUmount(string[] args)
 {
-    assert(0);
+    enum helpMsg =
+`bemgr umount <beName>
+bemgr unmount <beName>
+
+  Unmounts the given inactive boot environment.
+  It does not support forcefully unmounting, because zfs umount does not support
+  it on Linux, but if you know where the mountpoint is, then
+`;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt : getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+    import std.stdio : writeln;
+
+    import bemgr.util : getPoolInfo, isMounted, runCmd;
+
+    bool help;
+
+    getopt(args, "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 3, helpMsg);
+
+    immutable beName = args[2];
+
+    auto poolInfo = getPoolInfo();
+    immutable dataset = buildPath(poolInfo.beParent, beName);
+
+    enforce(isMounted(dataset), format!"Error: %s is not mounted"(dataset));
+
+    runCmd(format!"zfs umount %s"(esfn(dataset)));
+
+    return 0;
 }
