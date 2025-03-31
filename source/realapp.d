@@ -17,8 +17,8 @@ int realMain(string[] args)
   bemgr activate <beName>\n" ~
   bemgr create [-e <nonActiveBE> | -e <beName@snapshot>] <beName>\n" ~
   bemgr create <beName@snapshot>\n" ~
-  bemgr destroy [-F] [-n] <beName>\n" ~
-  bemgr destroy [-F] [-n] <beName@snapshot>\n" ~
+  bemgr destroy [-n] <beName>\n" ~
+  bemgr destroy [-n] <beName@snapshot>\n" ~
   bemgr list [-H] [--origin | -o]\n" ~
   bemgr mount <beName> <mountpoint>\n" ~
   bemgr rename <origBEName> <newBEName>\n" ~

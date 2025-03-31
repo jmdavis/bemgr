@@ -14,7 +14,7 @@ import bemgr.util : PoolInfo;
 int doDestroy(string[] args)
 {
     enum helpMsg =
-`bemgr destroy [-F] [-n] <beName>
+`bemgr destroy [-n] <beName>
 
   Destroys the given boot environment.
   If any of the boot environment's snapshots are the origin of another dataset,
@@ -27,7 +27,7 @@ int doDestroy(string[] args)
   -n Do a dry run. This will print out what would be destroyed and what
      what would be promoted if -n were not used.
 
-bemgr destroy [-F] [-n] <beName@snapshot>
+bemgr destroy [-n] <beName@snapshot>
 
   Destroys the given snapshot.
   If the snapshot is the origin of another dataset, then that dataset will be
@@ -62,9 +62,6 @@ bemgr destroy [-F] [-n] <beName@snapshot>
     }
 
     enforce(args.length == 3, helpMsg);
-
-    // Until we have this working properly, let's not accidentally destroy anything.
-    dryRun = true;
 
     immutable toDestroy = args[2];
     auto poolInfo = getPoolInfo();
