@@ -19,6 +19,8 @@ int realMain(string[] args)
   bemgr create <beName@snapshot>
   bemgr destroy [-n] <beName>
   bemgr destroy [-n] <beName@snapshot>
+  bemgr export [-v] sourceBE
+  bemgr import [-v] targetBE
   bemgr list [-H] [--origin | -o]
   bemgr mount <beName> <mountpoint>
   bemgr rename <origBEName> <newBEName>
@@ -44,6 +46,8 @@ Use --help on individual commands for more information.`;
             case "activate": return doActivate(args);
             case "create": return doCreate(args);
             case "destroy": return doDestroy(args);
+            case "export": return doExport(args);
+            case "import": return doExport(args);
             case "list": return doList(args);
             case "mount": return doMount(args);
             case "rename": return doRename(args);
@@ -115,6 +119,86 @@ int doActivate(string[] args)
     writefln("Successfully activated: %s", beName);
 
     return 0;
+}
+
+int doExport(string[] args)
+{
+    enum helpMsg =
+`bemgr export <sourceBE>
+
+  Exports the given boot environment to stdout. stdout must be piped or
+  redirected to another program or file.
+
+  -v displays verbose output
+`;
+    import std.datetime.date : DateTime;
+    import std.datetime.systime : Clock;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt : getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
+    import std.stdio : stderr, writeln;
+
+    import bemgr.util : getPoolInfo, runCmd;
+
+    bool verbose;
+    bool help;
+
+    getopt(args, "|v", &verbose,
+                 "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 3, helpMsg);
+
+    immutable beName = args[2];
+
+    auto poolInfo = getPoolInfo();
+    immutable dataset = buildPath(poolInfo.beParent, beName);
+    immutable snapName = format!"%s@%s"(dataset, (cast(DateTime)Clock.currTime()).toISOExtString());
+
+    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
+
+    runCmd(format!`zfs snap %s`(esfn(snapName)));
+    if(verbose)
+        stderr.writefln("Created snapshot: %s\n", snapName);
+
+    scope(success)
+    {
+        if(verbose)
+            stderr.writeln("\nExport complete");
+    }
+
+    scope(exit)
+    {
+        if(executeShell(format!`zfs list %s`(esfn(snapName))).status == 0)
+        {
+           if(executeShell(format!`zfs destroy %s`(esfn(snapName))).status == 0)
+           {
+               if(verbose)
+                   stderr.writefln("\n%s destroyed", snapName);
+           }
+           else
+               stderr.writefln!"Warning: Failed to destroy snapshot for export: %s"(snapName);
+        }
+        else
+            stderr.writefln("Warning: %s is missing and thus cannot be destroyed", snapName);
+    }
+
+    enforce(wait(spawnShell(format!`zfs send%s %s`(verbose ? " -v" : "", esfn(snapName)))) == 0,
+            "Error: zfs send failed");
+
+    return 0;
+}
+
+int doImport(string[] args)
+{
+    assert(0);
 }
 
 int doMount(string[] args)
