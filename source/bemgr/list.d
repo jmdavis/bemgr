@@ -47,7 +47,7 @@ int doList(string[] args)
     string[][] rows;
 
     if(!noHeaders)
-        rows ~= ["BE", "Active", "Mountpoint", "Space", "Referenced", "Created", "Origin"];
+        rows ~= ["BE", "Active", "Mountpoint", "Space", "Referenced", "If Last", "Created", "Origin"];
 
     auto poolInfo = getPoolInfo();
 
@@ -61,18 +61,15 @@ int doList(string[] args)
 
         immutable mountpoint = beInfo.dataset.mounted ? beInfo.dataset.mountpoint : "-";
 
-        auto originInfo = beInfo.dataset.originInfo;
-
-        // Origins are snapshots, so they don't have reservations.
-        immutable space = bytesToSize(originInfo ? originInfo.used
-                                                 : beInfo.dataset.usedByDataset + beInfo.dataset.usedByRefReservation);
-        immutable referenced = bytesToSize(originInfo ? originInfo.referenced : beInfo.dataset.referenced);
+        immutable space = bytesToSize(beInfo.space);
+        immutable referenced = bytesToSize(beInfo.referenced);
+        immutable ifLast = bytesToSize(beInfo.ifLast);
 
         string creation;
         with(beInfo.dataset.creationTime)
             creation = format!"%s-%02d-%02d %02d:%02d:%02d"(year, month, day, hour, minute, second);
 
-        rows ~= [beInfo.name, active, mountpoint, space, referenced, creation, beInfo.dataset.originName];
+        rows ~= [beInfo.name, active, mountpoint, space, referenced, ifLast, creation, beInfo.dataset.originName];
     }
 
     if(!noHeaders)
@@ -101,9 +98,9 @@ int doList(string[] args)
                 {
                     auto newCol = new char[](colLens[c]);
 
-                    // For c == 3 and c == 4, the idea is to right-justify the
-                    // numbers so that they line up nicely.
-                    if(c == 3 || c == 4)
+                    // The idea is to right-justify the disk space numbers so
+                    // that they line up nicely.
+                    if(c >= 3 && c <= 5)
                     {
                         newCol[0 .. $ - col.length] = ' ';
                         newCol[$ - col.length .. $] = col;
@@ -140,11 +137,26 @@ private:
 
 struct BEInfo
 {
-    import std.typecons : Nullable;
+    import std.bigint : BigInt;
 
     string name;
     DSInfo dataset;
     DSInfo[] snapshots;
+
+    // The space that the dataset takes up on its own.
+    // For clones, this is used of the dataset + used of the origin snapshot
+    // Otherwise, it's used of the dataset.
+    BigInt space;
+
+    // The space that the dataset references.
+    // For clones, this is referenced of the dataset + references of the origin
+    // snapshot.
+    // Otherwise, it's referenced of the dataset.
+    BigInt referenced;
+
+    // The space that the boot environment would take up if all of the other
+    // boot environments (and their clones) were destroyed.
+    BigInt ifLast;
 }
 
 // Dataset / Snapshot Info
@@ -212,14 +224,14 @@ struct DSInfo
 BEInfo[] getBEInfos(PoolInfo poolInfo)
 {
     import std.algorithm.iteration : filter, map;
-    import std.algorithm.searching : countUntil, find, startsWith;
+    import std.algorithm.searching : find, startsWith;
     import std.algorithm.sorting : sort;
     import std.array : array;
     import std.exception : enforce;
     import std.format : format;
     import std.process : escapeShellFileName;
     import std.range : chain, only;
-    import std.string : representation, splitLines;
+    import std.string : indexOf, representation, splitLines;
 
     import bemgr.util : runCmd;
 
@@ -251,18 +263,53 @@ BEInfo[] getBEInfos(PoolInfo poolInfo)
 
     retval.sort!((a, b) => a.dataset.creationTime < b.dataset.creationTime)();
 
+    BEInfo*[string] snapshotToCloneBE;
+
     foreach(ref beInfo; retval)
     {
+        beInfo.space += beInfo.dataset.used;
+        beInfo.referenced = beInfo.dataset.referenced;
+
         if(beInfo.dataset.originName != "-")
         {
             immutable origin = beInfo.dataset.originName;
-            auto originBE = retval.find!(a => a.dataset.name == origin[0 .. origin.representation.countUntil(ubyte('@'))])();
+            auto originBE = retval.find!(a => a.dataset.name == origin[0 .. origin.indexOf('@')])();
             enforce(!originBE.empty, format!"Error: Failed to find dataset for %s"(origin));
 
             auto originSnapshot = originBE.front.snapshots.find!(a => a.name == origin)();
             enforce(!originSnapshot.empty, format!"Error: Failed to find %s"(origin));
 
             beInfo.dataset.originInfo = &originSnapshot.front;
+            snapshotToCloneBE[originSnapshot.front.name] = &beInfo;
+
+            beInfo.space += beInfo.dataset.originInfo.used;
+        }
+    }
+
+    foreach(ref beInfo; retval)
+    {
+        beInfo.ifLast += beInfo.dataset.usedByDataset + beInfo.dataset.usedByRefReservation;
+
+        foreach(i, snap; beInfo.snapshots)
+        {
+            if(auto cloneBE = snap.name in snapshotToCloneBE)
+            {
+                // The snapshots which would be moved over to the clone if it
+                // were promoted. The snapshots were sorted by creation time
+                // above, so the ones before i are older than the origin
+                // snapshot.
+                foreach(s; beInfo.snapshots[0 .. i])
+                {
+                    // The snapshots which are the origins for other clones
+                    // would be destroyed with those clones, so they aren't
+                    // counted.
+                    if(s.name !in snapshotToCloneBE)
+                        (*cloneBE).ifLast += s.used;
+                }
+                (*cloneBE).ifLast += snap.referenced;
+            }
+            else
+                beInfo.ifLast += snap.used;
         }
     }
 
