@@ -24,7 +24,7 @@ int doCreate(string[] args)
     import std.datetime.systime : Clock;
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
@@ -35,8 +35,9 @@ int doCreate(string[] args)
     string origin;
     bool help;
 
-    getopt(args, "|e", &origin,
-                 "help", &help);
+    getopt(args, config.bundling,
+           "e", &origin,
+           "help", &help);
 
     if(help)
     {

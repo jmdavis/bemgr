@@ -73,7 +73,7 @@ int doActivate(string[] args)
 
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt;
+    import std.getopt : getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
@@ -145,7 +145,7 @@ int doExport(string[] args)
     bool verbose;
     bool help;
 
-    getopt(args, "|v", &verbose,
+    getopt(args, "v", &verbose,
                  "help", &help);
 
     if(help)
@@ -218,7 +218,7 @@ int doImport(string[] args)
     bool verbose;
     bool help;
 
-    getopt(args, "|v", &verbose,
+    getopt(args, "v", &verbose,
                  "help", &help);
 
     if(help)
@@ -313,7 +313,7 @@ int doRename(string[] args)
 
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt;
+    import std.getopt : getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;

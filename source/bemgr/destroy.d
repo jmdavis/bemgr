@@ -40,7 +40,7 @@ bemgr destroy [-n] <beName@snapshot>
     import std.algorithm.searching : canFind, find;
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
@@ -52,8 +52,9 @@ bemgr destroy [-n] <beName@snapshot>
     bool dryRun;
     bool help;
 
-    getopt(args, "|n", &dryRun,
-                 "help", &help);
+    getopt(args, config.bundling,
+           "|n", &dryRun,
+           "help", &help);
 
     if(help)
     {

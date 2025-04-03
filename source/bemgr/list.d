@@ -28,7 +28,7 @@ int doList(string[] args)
     import std.datetime.date : DateTime;
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.stdio : write, writeln;
 
     import bemgr.util : bytesToSize, getPoolInfo;
@@ -38,7 +38,7 @@ int doList(string[] args)
     bool snapshots;
     bool help;
 
-    getopt(args,
+    getopt(args, config.bundling,
            "a", &all,
            "H", &noHeaders,
            "s", &snapshots,
