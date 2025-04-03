@@ -68,7 +68,7 @@ int doActivate(string[] args)
     enum helpMsg =
 `  bemgr activate <beName>
 
-    Sets the given boot environment as the one to boot next time that the
+    Sets the given boot environment as the one to boot the next time that the
     computer is rebooted.`;
 
     import std.exception : enforce;

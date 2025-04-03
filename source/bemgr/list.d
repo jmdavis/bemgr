@@ -156,7 +156,7 @@ int doList(string[] args)
             foreach(c, ref col; row)
             {
                 // avoid trailing whitespace
-                if(c == row.length)
+                if(c == row.length - 1)
                     continue;
 
                 if(col.length < colLens[c])
