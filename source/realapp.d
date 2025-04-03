@@ -96,23 +96,33 @@ int doActivate(string[] args)
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
-    enforce(!isMounted(dataset), "Error: Cannot activate a mounted dataset");
+    if(poolInfo.bootFS == dataset)
+        writeln("Already activated");
+
+    if(poolInfo.rootFS != dataset)
+    {
+        // We want to be able to make it so that the currently active BE is
+        // active again on reboot if another BE is currently set to be active
+        // on reboot, but we don't want to muck around with mounted BE's
+        // otherwise, since changing the mountpoint to / will make it mount on
+        // top of the currently active BE and screw the system up.
+        enforce(!isMounted(dataset), "Error: Cannot activate a mounted dataset");
+
+        // These two should already be the case, since they're set when the
+        // boot environment is created, but we can't guarantee that no one has
+        // messed with them since then, so better safe than sorry. It's also
+        // why we need to check whether the dataset is mounted, since we don't
+        // want to mess with the mountpoint while the dataset is mounted (doing
+        // so can actually result in it being mounted on top of the running OS,
+        // making the OS inaccessible).
+        runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
+        runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)));
+    }
 
     immutable origin = runCmd(format!"zfs list -Ho origin %s"(esfn(dataset)),
                               format!"Error: %s does not exist"(dataset));
-
     if(origin != "-")
         runCmd(format!"zfs promote %s"(esfn(dataset)));
-
-    // These two should already be the case, since they're set when the boot
-    // environment is created, but we can't guarantee that no one has messed
-    // with them since then, so better safe than sorry. It's also why we need
-    // to check whether the dataset is mounted, since we don't want to mess
-    // with the mountpoint while the dataset is mounted (doing so can actually
-    // result in it being mounted on top of the running OS, making the OS
-    // inaccessible).
-    runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
-    runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)));
 
     runCmd(format!"zpool set bootfs=%s %s"(esfn(dataset), esfn(poolInfo.pool)));
 
