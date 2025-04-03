@@ -14,28 +14,34 @@ import bemgr.util : PoolInfo;
 int doList(string[] args)
 {
     enum helpMsg =
-`bemgr list [-Ho]
+`bemgr list [-a] [-H] [-s]
   Display all boot environments. The "Active" field indicates whether the
   boot environment is active now (N); active on reboot ("R"); or both ("NR").
 
-  -H will print headers, and it separates fields by a single tab instead of
-     arbitrary whitespace. Use for scripting.
+  -a will print out the datesets and origins for each boot environment.
 
-  --origin | -o will print out the origin snapshot for each boot environment.`;
+  -H will not print headers, and it separates fields by a single tab instead of
+     arbitrary whitespace. Used for scripting.
 
+  -s will print out the snapshots each boot environment (it implies -a).`;
+
+    import std.datetime.date : DateTime;
+    import std.exception : enforce;
     import std.format : format;
     import std.getopt : getopt;
     import std.stdio : write, writeln;
 
     import bemgr.util : bytesToSize, getPoolInfo;
 
+    bool all;
     bool noHeaders;
-    bool printOrigin;
+    bool snapshots;
     bool help;
 
     getopt(args,
-           "|H", &noHeaders,
-           "origin|o", &printOrigin,
+           "a", &all,
+           "H", &noHeaders,
+           "s", &snapshots,
            "help", &help);
 
     if(help)
@@ -44,32 +50,91 @@ int doList(string[] args)
         return 0;
     }
 
+    enforce(args.length == 2, helpMsg);
+
+    if(snapshots)
+        all = true;
+
     string[][] rows;
+    bool[] rightJustify;
 
     if(!noHeaders)
-        rows ~= ["BE", "Active", "Mountpoint", "Space", "Referenced", "If Last", "Created", "Origin"];
+    {
+        if(all)
+        {
+            rows ~= ["BE/Dataset/Snapshot", "Active", "Mountpoint", "Space", "Referenced", "Created"];
+            rows ~= [""];
+            rightJustify = [false, false, false, true, true, false];
+        }
+        else
+        {
+            rows ~= ["BE", "Active", "Mountpoint", "Space", "Referenced", "If Last", "Created"];
+            rightJustify = [false, false, false, true, true, true, false];
+        }
+    }
 
     auto poolInfo = getPoolInfo();
+    auto beInfos = getBEInfos(poolInfo);
 
-    foreach(beInfo; getBEInfos(poolInfo))
+    static string creationToString(DateTime dt)
     {
-        string active;
-        if(beInfo.dataset.name == poolInfo.rootFS)
-            active = beInfo.dataset.name == poolInfo.bootFS ? "NR" : "N";
-        else
-            active = beInfo.dataset.name == poolInfo.bootFS ? "R" : "-";
+        return format!"%s-%02d-%02d %02d:%02d:%02d"(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+    }
 
-        immutable mountpoint = beInfo.dataset.mounted ? beInfo.dataset.mountpoint : "-";
+    foreach(i, beInfo; beInfos)
+    {
+        if(all)
+            rows ~= [beInfo.name];
 
-        immutable space = bytesToSize(beInfo.space);
-        immutable referenced = bytesToSize(beInfo.referenced);
-        immutable ifLast = bytesToSize(beInfo.ifLast);
+        {
+            string active;
+            if(beInfo.dataset.name == poolInfo.rootFS)
+                active = beInfo.dataset.name == poolInfo.bootFS ? "NR" : "N";
+            else
+                active = beInfo.dataset.name == poolInfo.bootFS ? "R" : "-";
 
-        string creation;
-        with(beInfo.dataset.creationTime)
-            creation = format!"%s-%02d-%02d %02d:%02d:%02d"(year, month, day, hour, minute, second);
+            immutable mountpoint = beInfo.dataset.mounted ? beInfo.dataset.mountpoint : "-";
+            immutable space = bytesToSize(beInfo.space);
+            immutable referenced = bytesToSize(beInfo.referenced);
+            immutable creation = creationToString(beInfo.dataset.creationTime);
 
-        rows ~= [beInfo.name, active, mountpoint, space, referenced, ifLast, creation, beInfo.dataset.originName];
+            if(all)
+                rows ~= ["  " ~ beInfo.dataset.name, active, mountpoint, space, referenced, creation];
+            else
+            {
+                immutable ifLast = bytesToSize(beInfo.ifLast);
+                rows ~= [beInfo.name, active, mountpoint, space, referenced, ifLast, creation];
+            }
+        }
+
+        if(all)
+        {
+            if(auto originInfo = beInfo.dataset.originInfo)
+            {
+                enum active = "-";
+                enum mountpoint = "-";
+                immutable space = bytesToSize(originInfo.used);
+                immutable referenced = bytesToSize(originInfo.referenced);
+                immutable creation = creationToString(originInfo.creationTime);
+                rows ~= ["    " ~ originInfo.name, active, mountpoint, space, referenced, creation];
+            }
+
+            if(snapshots)
+            {
+                foreach(snap; beInfo.snapshots)
+                {
+                    enum active = "-";
+                    enum mountpoint = "-";
+                    immutable space = bytesToSize(snap.used);
+                    immutable referenced = bytesToSize(snap.referenced);
+                    immutable creation = creationToString(snap.creationTime);
+                    rows ~= ["  " ~ snap.name, active, mountpoint, space, referenced, creation];
+                }
+            }
+
+            if(i != beInfos.length - 1)
+                rows ~= [""];
+        }
     }
 
     if(!noHeaders)
@@ -100,7 +165,7 @@ int doList(string[] args)
 
                     // The idea is to right-justify the disk space numbers so
                     // that they line up nicely.
-                    if(c >= 3 && c <= 5)
+                    if(rightJustify[c])
                     {
                         newCol[0 .. $ - col.length] = ' ';
                         newCol[$ - col.length .. $] = col;
@@ -119,9 +184,6 @@ int doList(string[] args)
 
     foreach(row; rows)
     {
-        if(!printOrigin)
-            --row.length;
-
         foreach(i; 0 .. row.length - 1)
         {
             write(row[i]);

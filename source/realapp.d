@@ -21,7 +21,7 @@ int realMain(string[] args)
   bemgr destroy [-n] <beName@snapshot>
   bemgr export [-v] sourceBE
   bemgr import [-v] targetBE
-  bemgr list [-H] [--origin | -o]
+  bemgr list [-a] [-H] [-s]
   bemgr mount <beName> <mountpoint>
   bemgr rename <origBEName> <newBEName>
   bemgr umount <beName>
