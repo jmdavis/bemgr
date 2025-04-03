@@ -114,7 +114,7 @@ int doActivate(string[] args)
     runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
     runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)));
 
-    runCmd(format!"zpool set bootfs=%s"(esfn(dataset)));
+    runCmd(format!"zpool set bootfs=%s %s"(esfn(dataset), esfn(poolInfo.pool)));
 
     writefln("Successfully activated: %s", beName);
 
