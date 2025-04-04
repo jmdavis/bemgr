@@ -57,11 +57,9 @@ bemgr create <beName@snapshot>
     enforce(args.length == 3, helpMsg);
 
     immutable newBE = args[2];
+    auto poolInfo = getPoolInfo();
 
-    {
-        enum fmt =
-`Error: Cannot create a boot environment with the name "%s"
-The characters allowed in boot environment names are:
+    enum allowed = `
     ASCII letters: a-z A-Z
     ASCII Digits: 0-9
     Underscore: _
@@ -69,10 +67,33 @@ The characters allowed in boot environment names are:
     Colon: :
     Hypthen: -`;
 
+    {
+        immutable at = newBE.indexOf('@');
+
+        if(at != -1)
+        {
+            enforce(origin.empty, "Error: -e is illegal when creating a snapshot");
+            enforceDSExists(buildPath(poolInfo.beParent, newBE[0 .. at]));
+
+            enum fmt =
+`Error: Cannot create a snapshot with the name "%s".
+The characters allowed in boot environment snapshots names are:` ~ allowed;
+
+            enforce(validName(newBE), format!fmt(newBE));
+            runCmd(format!"zfs snap %s"(esfn(buildPath(poolInfo.beParent, newBE))));
+
+            return 0;
+        }
+    }
+
+    {
+        enum fmt =
+`Error: Cannot create a boot environment with the name "%s".
+The characters allowed in boot environment names are:` ~ allowed;
+
         enforce(validName(newBE), format!fmt((newBE)));
     }
 
-    auto poolInfo = getPoolInfo();
     immutable clone = buildPath(poolInfo.beParent, newBE);
 
     if(origin.empty)
@@ -82,6 +103,7 @@ The characters allowed in boot environment names are:
     }
     else if(origin.indexOf('@') == -1)
     {
+        enforceDSExists(origin);
         origin = format!"%s/%s@%s"(poolInfo.beParent, origin, (cast(DateTime)Clock.currTime()).toISOExtString());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
