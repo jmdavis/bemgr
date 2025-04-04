@@ -15,13 +15,13 @@ int doExport(string[] args)
   Exports the given boot environment to stdout. stdout must be piped or
   redirected to another program or file.
 
-  -v displays verbose output
-`;
+  -v displays verbose output`;
+
     import std.datetime.date : DateTime;
     import std.datetime.systime : Clock;
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
     import std.stdio : stderr, writeln;
@@ -31,8 +31,9 @@ int doExport(string[] args)
     bool verbose;
     bool help;
 
-    getopt(args, "v", &verbose,
-                 "help", &help);
+    getopt(args, config.bundling,
+           "v", &verbose,
+           "help", &help);
 
     if(help)
     {
@@ -90,11 +91,11 @@ int doImport(string[] args)
   Takes input from stdin to create the given boot environment and creates
   the given boot environment from it.
 
-  -v displays verbose output
-`;
+  -v displays verbose output`;
+
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
     import std.stdio : stderr, writeln;
@@ -104,8 +105,9 @@ int doImport(string[] args)
     bool verbose;
     bool help;
 
-    getopt(args, "v", &verbose,
-                 "help", &help);
+    getopt(args, config.bundling,
+           "v", &verbose,
+           "help", &help);
 
     if(help)
     {

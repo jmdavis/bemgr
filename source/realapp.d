@@ -17,15 +17,15 @@ int realMain(string[] args)
   bemgr activate <beName>
   bemgr create [-e <beName> | -e <beName@snapshot>] <newBeName>
   bemgr create <beName@snapshot>
-  bemgr destroy [-n] <beName>
-  bemgr destroy [-n] <beName@snapshot>
+  bemgr destroy [-n] [-F] <beName>
+  bemgr destroy [-n] [-F] <beName@snapshot>
   bemgr export [-v] sourceBE
   bemgr import [-v] targetBE
   bemgr list [-a] [-H] [-s]
   bemgr mount <beName> <mountpoint>
   bemgr rename <origBEName> <newBEName>
-  bemgr umount <beName>
-  bemgr unmount <beName>
+  bemgr umount [-f] <beName>
+  bemgr unmount [-f] <beName>
 
 Use --help on individual commands for more information.`;
 
@@ -75,7 +75,7 @@ int doActivate(string[] args)
 
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
@@ -84,7 +84,8 @@ int doActivate(string[] args)
 
     bool help;
 
-    getopt(args, "help", &help);
+    getopt(args, config.bundling,
+           "help", &help);
 
     if(help)
     {

@@ -13,12 +13,12 @@ int doMount(string[] args)
 `bemgr mount <beName> <mountpoint>
 
   Mounts the given boot environment at the given mountpoint.
-  It has no effect on the mountpoint property of the dataset.
-`;
+  It has no effect on the mountpoint property of the dataset.`;
+
     import std.exception : enforce;
     import std.file : exists, isDir;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
@@ -27,7 +27,8 @@ int doMount(string[] args)
 
     bool help;
 
-    getopt(args, "help", &help);
+    getopt(args, config.bundling,
+           "help", &help);
 
     if(help)
     {
@@ -54,7 +55,7 @@ int doMount(string[] args)
     else version(linux)
         runCmd(format!"mount -t zfs -o zfsutil %s %s"(esfn(dataset), esfn(mountpoint)));
     else
-        static assert(false, "Unsupport OS");
+        static assert(false, "Unsupported OS");
 
     return 0;
 }
@@ -66,21 +67,36 @@ int doUmount(string[] args)
 bemgr unmount <beName>
 
   Unmounts the given inactive boot environment.
-  It does not support forcefully unmounting, because zfs umount does not support
-  it on Linux, but if you know where the mountpoint is, then
-`;
+
+  -f On FreeBSD, this will forcefully unmount the dataset.
+     It is not supported on Linux, because "zfs mount" does not support it on
+     Linux.`;
+
     import std.exception : enforce;
     import std.format : format;
-    import std.getopt : getopt;
+    import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
 
     import bemgr.util : getPoolInfo, runCmd;
 
+    bool force;
     bool help;
 
-    getopt(args, "help", &help);
+    version(FreeBSD)
+    {
+        getopt(args, config.bundling,
+               "help", &help);
+    }
+    else version(linux)
+    {
+        getopt(args, config.bundling,
+               "f", &force,
+               "help", &help);
+    }
+    else
+        static assert(false, "Unsupported OS");
 
     if(help)
     {
@@ -98,7 +114,7 @@ bemgr unmount <beName>
     runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
     enforce(dataset in poolInfo.mountpoints, format!"Error: %s is not mounted"(dataset));
 
-    runCmd(format!"zfs umount %s"(esfn(dataset)));
+    runCmd(format!"zfs umount%s %s"(force ? " -f" : "", esfn(dataset)));
 
     return 0;
 }

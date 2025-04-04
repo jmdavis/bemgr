@@ -14,9 +14,10 @@ import bemgr.util : PoolInfo;
 int doDestroy(string[] args)
 {
     enum helpMsg =
-`bemgr destroy [-n] <beName>
+`bemgr destroy [-n] [-F] <beName>
 
   Destroys the given boot environment.
+
   If any of the boot environment's snapshots are the origin of another dataset,
   then the newest dataset of the newest snapshot will be promoted.
   If the boot environment has an origin (and thus is a clone), and that origin
@@ -27,15 +28,21 @@ int doDestroy(string[] args)
   -n Do a dry run. This will print out what would be destroyed and what
      what would be promoted if -n were not used.
 
-bemgr destroy [-n] <beName@snapshot>
+  -F will forcefully unmount the dataset and any of its snapshots which are
+     mounted. So, it will be unmounted even it is in use.
+
+bemgr destroy [-n] [-F] <beName@snapshot>
 
   Destroys the given snapshot.
-  If the snapshot is the origin of another dataset, then that dataset will be
-  promoted.
+
+  If the snapshot is the origin of a dataset, then the result will be an error
+  and nothing will be destroyed.
 
   Note that unlike beadm, there is no confirmation.
 
-  -n same as above`;
+  -n same as above
+
+  -F same as above`;
 
     import std.algorithm.searching : find;
     import std.exception : enforce;
@@ -50,10 +57,12 @@ bemgr destroy [-n] <beName@snapshot>
     import bemgr.util : getPoolInfo, runCmd;
 
     bool dryRun;
+    bool force;
     bool help;
 
     getopt(args, config.bundling,
            "n", &dryRun,
+           "f", &force,
            "help", &help);
 
     if(help)
@@ -81,7 +90,7 @@ bemgr destroy [-n] <beName@snapshot>
         if(dryRun)
             writefln("Snapshot to destroy: %s", snapName);
         else
-            runCmd(format!"zfs destroy %s"(esfn(snapName)));
+            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(snapName)));
 
         return 0;
     }
@@ -114,9 +123,9 @@ bemgr destroy [-n] <beName@snapshot>
     {
         foreach(e; di.toPromote)
             runCmd(format!"zfs promote %s"(esfn(e)));
-        runCmd(format!"zfs destroy -r %s"(esfn(di.dataset)));
+        runCmd(format!"zfs destroy%s -r %s"(force ? " -f" : "", esfn(di.dataset)));
         if(!di.origin.empty)
-            runCmd(format!"zfs destroy %s"(esfn(di.origin)));
+            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(di.origin)));
     }
 
     return 0;
