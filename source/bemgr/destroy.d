@@ -37,14 +37,14 @@ bemgr destroy [-n] <beName@snapshot>
 
   -n same as above`;
 
-    import std.algorithm.searching : canFind, find;
+    import std.algorithm.searching : find;
     import std.exception : enforce;
     import std.format : format;
     import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
-    import std.string : representation, splitLines;
+    import std.string : indexOf, splitLines;
     import std.stdio : writefln;
 
     import bemgr.util : getPoolInfo, runCmd;
@@ -53,7 +53,7 @@ bemgr destroy [-n] <beName@snapshot>
     bool help;
 
     getopt(args, config.bundling,
-           "|n", &dryRun,
+           "n", &dryRun,
            "help", &help);
 
     if(help)
@@ -67,15 +67,16 @@ bemgr destroy [-n] <beName@snapshot>
     immutable toDestroy = args[2];
     auto poolInfo = getPoolInfo();
 
-    if(toDestroy.representation.canFind(ubyte('@')))
+    if(toDestroy.indexOf('@') != -1)
     {
         immutable snapName = buildPath(poolInfo.beParent, toDestroy);
 
         runCmd(format!`zfs list %s`(snapName), format!"Error: %s does not exist"(snapName));
 
-        auto result = runCmd(format!`zfs list -Ht filesystem,volume -o origin -r %s`(esfn(poolInfo.pool)));
-        auto found = result.splitLines().find(snapName);
-        enforce(!found.empty, format!"Error: %s is the origin of a %s"(snapName, found.front));
+        auto result = runCmd(format!`zfs list -Ht filesystem,volume -o name,origin -r %s`(esfn(poolInfo.pool)));
+        auto found = result.splitLines().find!(a => a[a.indexOf('\t') + 1 .. $] == snapName)();
+        enforce(found.empty,
+                format!"Error: %s is the origin of %s"(snapName, found.front[0 .. found.front.indexOf('\t')]));
 
         if(dryRun)
             writefln("Snapshot to destroy: %s", snapName);
