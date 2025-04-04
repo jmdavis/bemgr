@@ -303,11 +303,12 @@ int doMount(string[] args)
     immutable beName = args[2];
     immutable mountpoint = args[3];
 
-    enforce(mountpoint.exists, format!"Error: %s does not exist"(mountpoint));
-    enforce(mountpoint.isDir, format!"Error: %s is not a directory"(mountpoint));
-
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
+
+    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
+    enforce(mountpoint.exists, format!"Error: %s does not exist"(mountpoint));
+    enforce(mountpoint.isDir, format!"Error: %s is not a directory"(mountpoint));
 
     version(FreeBSD)
         runCmd(format!"mount -t zfs %s %s"(esfn(dataset), esfn(mountpoint)));
