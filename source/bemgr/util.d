@@ -17,15 +17,24 @@ struct PoolInfo
     string rootFS;
     string bootFS;
     string beParent;
+    string[string] mountpoints;
 
-    this(string pool, string rootFS, string bootFS)
+    private this(string pool, string rootFS, string bootFS, Mountpoint[] mounted)
     {
+        import std.algorithm.searching : startsWith;
         import std.path : dirName;
 
         this.pool = pool;
         this.rootFS = rootFS;
         this.bootFS = bootFS;
         this.beParent = rootFS.dirName;
+
+        immutable start = this.beParent ~ '/';
+        foreach(e; mounted)
+        {
+            if(e.dsName.startsWith(start))
+                mountpoints[e.dsName] = e.mountpoint;
+        }
     }
 }
 
@@ -34,19 +43,22 @@ PoolInfo getPoolInfo()
     import std.algorithm.searching : find, startsWith;
     import std.exception : enforce;
     import std.format : format;
-    import std.process : escapeShellFileName;
+    import std.process : esfn = escapeShellFileName;
+    import std.string : indexOf;
 
-    immutable rootFS = runCmd(`mount | awk '/ \/ / {print $1}'`, "Failed to get the root filesystem");
-    enforce(!rootFS.startsWith("/dev"), "Error: This system does not boot from a ZFS pool");
+    auto mounted = getMounted();
+    auto found = mounted.find!(a => a.mountpoint == "/")();
+    enforce(!found.empty, "Error: This system does not boot from a ZFS pool");
 
-    auto found = rootFS.find('/');
-    enforce(!found.empty, "This system is not configured for boot environments");
-    immutable pool = rootFS[0 .. rootFS.length - found.length];
+    immutable rootFS = found.front.dsName;
+    immutable slash = rootFS.indexOf('/');
+    enforce(slash != -1, "This system is not configured for boot environments");
 
-    immutable bootFS = runCmd(format!`zpool get -H -o value bootfs %s`(escapeShellFileName(pool)),
+    immutable pool = rootFS[0 .. slash];
+    immutable bootFS = runCmd(format!`zpool get -H -o value bootfs %s`(esfn(pool)),
                               format!"Error: ZFS boot pool '%s' has unset 'bootfs' property"(pool));
 
-    return PoolInfo(pool, rootFS, bootFS);
+    return PoolInfo(pool, rootFS, bootFS, mounted);
 }
 
 // Realistically, using BigInt is overkill, since boot pools generally aren't
@@ -188,23 +200,6 @@ DateTime parseDate(string str)
         throw new Exception(format!`Error: The creation field of zfs list has an unexpected format: %s`(str));
 }
 
-bool isMounted(string dataset)
-{
-    import std.algorithm.searching : find, startsWith;
-    import std.format : format;
-    import std.string : representation, splitLines;
-
-    // Unfortunately, datasets mounted with mount -t zfs don't seem to show up
-    // as mounted in the zfs properties. So, we have to use the mount command to
-    // get that information so that we can know for sure whether it's actually
-    // mounted or not.
-
-    auto mountLines = runCmd("mount", format!"Error: Failed to determine whether %s was mounted"(dataset)).splitLines();
-    immutable lineStart = format!"%s on "(dataset).representation;
-
-    return !mountLines.find!(a => a.representation.startsWith(lineStart)).empty;
-}
-
 string runCmd(string cmd)
 {
     import std.exception : enforce;
@@ -227,4 +222,36 @@ string runCmd(string cmd, lazy string errorMsg)
     immutable result = executeShell(cmd);
     enforce(result.status == 0, errorMsg);
     return result.output.strip();
+}
+
+private:
+
+struct Mountpoint
+{
+    string dsName; // dataset or snapshot
+    string mountpoint;
+
+    this(string line)
+    {
+        import std.algorithm.searching : find;
+        import std.string : representation, stripRight;
+
+        auto found = line.representation.find("  /");
+
+        this.dsName = line[0 .. $ - found.length].stripRight();
+        this.mountpoint = cast(string)found[2 .. $];
+    }
+}
+
+// This differs from the mountpoint property, since it's possible to use
+// mount -t zfs to mount datasets and snapshots somewhere other than where
+// their mountpoint property indicates.
+Mountpoint[] getMounted()
+{
+    import std.algorithm.iteration : map;
+    import std.array : array;
+    import std.format : format;
+    import std.string : splitLines;
+
+    return runCmd("zfs mount").splitLines().map!Mountpoint().array();
 }

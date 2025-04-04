@@ -228,7 +228,11 @@ struct DSInfo
     import std.datetime : DateTime;
 
     string name;
-    string mountpoint;
+
+    // If mounted, this is the actual mountpoint, not necessarily the mountpoint
+    // property on the dataset or snapshot.
+    string mountpoint = "-";
+
     bool mounted;
 
     // The space used by the dataset and its children.
@@ -247,65 +251,70 @@ struct DSInfo
     BigInt referenced;
 
     DateTime creationTime;
+
     string originName;
     DSInfo* originInfo;
-    bool snapshot;
 
-    enum listCmd = `zfs list -Hpt filesystem,snapshot,volume ` ~
+    // Only for snapshots.
+    string parent;
+
+    enum listCmd = `zfs list -Hpt filesystem,snapshot ` ~
                    // These are the fields parsed in the constructor
-                   `-o name,mountpoint,mounted,used,usedds,usedsnap,usedrefreserv,refer,creation,origin ` ~
+                   `-o name,mounted,used,usedds,usedsnap,usedrefreserv,refer,creation,origin ` ~
                    `-r %s`;
 
-    this(string line)
+    this(string line, string[string] mountpoints)
     {
-        import std.algorithm.searching : canFind;
         import std.exception : enforce;
-        import std.string : representation, split;
+        import std.string : indexOf, split;
 
         import bemgr.util : parseDate, parseSize;
 
         auto parts = line.split();
-        enforce(parts.length == 10,
+        enforce(parts.length == 9,
                 `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
 
         this.name = parts[0];
-        this.mountpoint = parts[1];
-        this.mounted = parts[2] == "yes";
-        this.used = parseSize(parts[3], "used");
-        this.usedByDataset = parseSize(parts[4], "usedds");
-        this.usedBySnapshots = parseSize(parts[5], "usedsnap");
-        this.usedByRefReservation = parseSize(parts[6], "usedrefreserv");
-        this.referenced = parseSize(parts[7], "refer");
-        this.creationTime = parseDate(parts[8]);
-        this.originName = parts[9];
+        this.mounted = parts[1] == "yes";
+        this.used = parseSize(parts[2], "used");
+        this.usedByDataset = parseSize(parts[3], "usedds");
+        this.usedBySnapshots = parseSize(parts[4], "usedsnap");
+        this.usedByRefReservation = parseSize(parts[5], "usedrefreserv");
+        this.referenced = parseSize(parts[6], "refer");
+        this.creationTime = parseDate(parts[7]);
+        this.originName = parts[8];
 
-        this.snapshot = name.representation.canFind(ubyte('@'));
+        immutable at = name.indexOf('@');
+        if(at != -1)
+            this.parent = name[0 .. at];
+
+        if(auto mountpoint = this.name in mountpoints)
+            this.mountpoint = *mountpoint;
     }
 }
 
 BEInfo[] getBEInfos(PoolInfo poolInfo)
 {
     import std.algorithm.iteration : filter, map;
-    import std.algorithm.searching : find, startsWith;
+    import std.algorithm.searching : find;
     import std.algorithm.sorting : sort;
     import std.array : array;
     import std.exception : enforce;
     import std.format : format;
-    import std.process : escapeShellFileName;
-    import std.range : chain, only;
-    import std.string : indexOf, representation, splitLines;
+    import std.process : esfn = escapeShellFileName;
+    import std.string : indexOf, splitLines;
 
     import bemgr.util : runCmd;
 
-    immutable result = runCmd(format!(DSInfo.listCmd)(escapeShellFileName(poolInfo.beParent)),
+    immutable result = runCmd(format!(DSInfo.listCmd)(esfn(poolInfo.beParent)),
                               "Error: Failed to get the list of boot environments");
-    auto dsInfos = result.splitLines().map!DSInfo().filter!(a => a.name != poolInfo.beParent)().array();
+    auto dsInfos = result.splitLines().map!(a => DSInfo(a, poolInfo.mountpoints))().filter!(a => a.name != poolInfo.beParent)().array();
 
     BEInfo[] retval;
 
     foreach(dsInfo; dsInfos)
     {
-        if(dsInfo.snapshot)
+        if(!dsInfo.parent.empty)
             continue;
 
         BEInfo beInfo;
@@ -314,7 +323,7 @@ BEInfo[] getBEInfos(PoolInfo poolInfo)
 
         foreach(other; dsInfos)
         {
-            if(other.name.representation.startsWith(chain(dsInfo.name.representation, only(ubyte('@')))))
+            if(other.parent == dsInfo.name)
                 beInfo.snapshots ~= other;
         }
 

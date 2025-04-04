@@ -80,7 +80,7 @@ int doActivate(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
 
-    import bemgr.util : getPoolInfo, isMounted, runCmd;
+    import bemgr.util : getPoolInfo, runCmd;
 
     bool help;
 
@@ -108,7 +108,7 @@ int doActivate(string[] args)
         // on reboot, but we don't want to muck around with mounted BE's
         // otherwise, since changing the mountpoint to / will make it mount on
         // top of the currently active BE and screw the system up.
-        enforce(!isMounted(dataset), "Error: Cannot activate a mounted dataset");
+        enforce(dataset !in poolInfo.mountpoints, "Error: Cannot activate a mounted dataset");
 
         // These two should already be the case, since they're set when the
         // boot environment is created, but we can't guarantee that no one has
