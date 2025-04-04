@@ -309,7 +309,12 @@ int doMount(string[] args)
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
-    runCmd(format!"mount -t zfs %s %s"(esfn(dataset), esfn(mountpoint)));
+    version(FreeBSD)
+        runCmd(format!"mount -t zfs %s %s"(esfn(dataset), esfn(mountpoint)));
+    else version(linux)
+        runCmd(format!"mount -t zfs -o zfsutil %s %s"(esfn(dataset), esfn(mountpoint)));
+    else
+        static assert(false, "Unsupport OS");
 
     return 0;
 }
