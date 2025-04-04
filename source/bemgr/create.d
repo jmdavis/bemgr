@@ -12,14 +12,23 @@ import std.range.primitives;
 int doCreate(string[] args)
 {
     enum helpMsg =
-`bemgr create [-e <beName> | -e <beName@snapshot>] <beName>
+`bemgr create [-e <beName> | -e <beName@snapshot>] <newBEName>
 
-  Creates a new boot environment named beName.
+  Creates a new boot environment with the given name from the currently active
+  boot environment - e.g. "bemgr foo" would create a new boot environment named
+  "foo" by snapshoting the currently active boot environment and then cloning
+  that snapshot.
 
   -e specifies the boot environment or snapshot of a boot environment to clone
-     the new boot environment from.`;
+     the new boot environment from rather than the currently active boot
+     environment.
 
-    import std.algorithm.searching : canFind;
+bemgr create <beName@snapshot>
+
+  Creates a new snapshot - e.g. "bemgr foo@bar" would take a snapshot of foo's
+  dataset and name the snapshot "bar", so if "zroot/ROOT" were the parent of the
+  BE datasets, then the snapshot would be "zroot/ROOT/foo@bar".`;
+
     import std.datetime.date : DateTime;
     import std.datetime.systime : Clock;
     import std.exception : enforce;
@@ -28,7 +37,7 @@ int doCreate(string[] args)
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
-    import std.string : representation;
+    import std.string : indexOf;
 
     import bemgr.util : getPoolInfo, runCmd;
 
@@ -71,11 +80,13 @@ The characters allowed in boot environment names are:
         origin = format!"%s@%s"(poolInfo.rootFS, (cast(DateTime)Clock.currTime()).toISOExtString());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
-    else if(!origin.representation.canFind(ubyte('@')))
+    else if(origin.indexOf('@') == -1)
     {
-        origin = format!"%s@%s"(origin, (cast(DateTime)Clock.currTime()).toISOExtString());
+        origin = format!"%s/%s@%s"(poolInfo.beParent, origin, (cast(DateTime)Clock.currTime()).toISOExtString());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
+    else
+        origin = buildPath(poolInfo.beParent, origin);
 
     runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)));
     runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)));
