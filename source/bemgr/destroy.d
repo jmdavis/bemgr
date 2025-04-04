@@ -156,18 +156,24 @@ struct DSInfo
 
     this(string line)
     {
-        import std.conv : ConvException, to;
+        import std.algorithm.iteration : splitter;
         import std.exception : enforce;
-        import std.string : indexOf, split;
+        import std.string : indexOf;
 
         import bemgr.util : parseDate;
 
-        auto parts = line.split();
-        enforce(parts.length == 3,
-                `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
-        this.name = parts[0];
-        this.creationTime = parseDate(parts[1]);
-        this.originName = parts[2];
+        auto parts = line.splitter('\t');
+        string next(bool last)
+        {
+            immutable retval = parts.front;
+            parts.popFront();
+            enforce(parts.empty == last,
+                    `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
+            return retval;
+        }
+        this.name = next(false);
+        this.creationTime = parseDate(next(false));
+        this.originName = next(true);
 
         immutable at = name.indexOf('@');
         if(at != -1)

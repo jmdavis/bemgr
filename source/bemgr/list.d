@@ -265,24 +265,31 @@ struct DSInfo
 
     this(string line, string[string] mountpoints)
     {
+        import std.algorithm.iteration : splitter;
         import std.exception : enforce;
-        import std.string : indexOf, split;
+        import std.string : indexOf;
 
         import bemgr.util : parseDate, parseSize;
 
-        auto parts = line.split();
-        enforce(parts.length == 9,
-                `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
+        auto parts = line.splitter('\t');
+        string next(bool last)
+        {
+            immutable retval = parts.front;
+            parts.popFront();
+            enforce(parts.empty == last,
+                    `Error: The format from "zfs list" seems to have changed from what bemgr expects`);
+            return retval;
+        }
 
-        this.name = parts[0];
-        this.mounted = parts[1] == "yes";
-        this.used = parseSize(parts[2], "used");
-        this.usedByDataset = parseSize(parts[3], "usedds");
-        this.usedBySnapshots = parseSize(parts[4], "usedsnap");
-        this.usedByRefReservation = parseSize(parts[5], "usedrefreserv");
-        this.referenced = parseSize(parts[6], "refer");
-        this.creationTime = parseDate(parts[7]);
-        this.originName = parts[8];
+        this.name = next(false);
+        this.mounted = next(false) == "yes";
+        this.used = parseSize(next(false), "used");
+        this.usedByDataset = parseSize(next(false), "usedds");
+        this.usedBySnapshots = parseSize(next(false), "usedsnap");
+        this.usedByRefReservation = parseSize(next(false), "usedrefreserv");
+        this.referenced = parseSize(next(false), "refer");
+        this.creationTime = parseDate(next(false));
+        this.originName = next(true);
 
         immutable at = name.indexOf('@');
         if(at != -1)
