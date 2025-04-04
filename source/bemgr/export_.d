@@ -26,7 +26,7 @@ int doExport(string[] args)
     import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
     import std.stdio : stderr, writeln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
     bool verbose;
     bool help;
@@ -49,7 +49,7 @@ int doExport(string[] args)
     immutable dataset = buildPath(poolInfo.beParent, beName);
     immutable snapName = format!"%s@%s"(dataset, (cast(DateTime)Clock.currTime()).toISOExtString());
 
-    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
+    enforceDSExists(dataset);
 
     runCmd(format!`zfs snap %s`(esfn(snapName)));
     if(verbose)

@@ -39,7 +39,7 @@ bemgr create <beName@snapshot>
     import std.stdio : writeln;
     import std.string : indexOf;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
     string origin;
     bool help;
@@ -86,7 +86,10 @@ The characters allowed in boot environment names are:
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else
+    {
         origin = buildPath(poolInfo.beParent, origin);
+        enforceDSExists(origin);
+    }
 
     runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)));
     runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)));

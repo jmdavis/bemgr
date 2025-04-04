@@ -224,6 +224,14 @@ string runCmd(string cmd, lazy string errorMsg)
     return result.output.strip();
 }
 
+void enforceDSExists(string dsName)
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+
+    runCmd(format!`zfs list %s`(esfn(dsName)), format!"Error: %s does not exist"(dsName));
+}
+
 private:
 
 struct Mountpoint

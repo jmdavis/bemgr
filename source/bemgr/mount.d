@@ -23,7 +23,7 @@ int doMount(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
     bool help;
 
@@ -44,7 +44,7 @@ int doMount(string[] args)
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
-    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
+    enforceDSExists(dataset);
     enforce(dataset !in poolInfo.mountpoints,  format!"Error: %s is already mounted"(dataset));
 
     enforce(mountpoint.exists, format!"Error: %s does not exist"(mountpoint));
@@ -79,7 +79,7 @@ bemgr unmount <beName>
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writeln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
     bool force;
     bool help;
@@ -111,7 +111,7 @@ bemgr unmount <beName>
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
-    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
+    enforceDSExists(dataset);
     enforce(dataset in poolInfo.mountpoints, format!"Error: %s is not mounted"(dataset));
 
     runCmd(format!"zfs umount%s %s"(force ? " -f" : "", esfn(dataset)));

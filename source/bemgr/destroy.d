@@ -54,7 +54,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     import std.string : indexOf, splitLines;
     import std.stdio : writefln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
     bool dryRun;
     bool force;
@@ -79,8 +79,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     if(toDestroy.indexOf('@') != -1)
     {
         immutable snapName = buildPath(poolInfo.beParent, toDestroy);
-
-        runCmd(format!`zfs list %s`(snapName), format!"Error: %s does not exist"(snapName));
+        enforceDSExists(snapName);
 
         auto result = runCmd(format!`zfs list -Ht filesystem,volume -o name,origin -r %s`(esfn(poolInfo.pool)));
         auto found = result.splitLines().find!(a => a[a.indexOf('\t') + 1 .. $] == snapName)();
