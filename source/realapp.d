@@ -390,6 +390,7 @@ bemgr unmount <beName>
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
+    runCmd(format!`zfs list %s`(esfn(dataset)), format!"Error: %s does not exist"(dataset));
     enforce(isMounted(dataset), format!"Error: %s is not mounted"(dataset));
 
     runCmd(format!"zfs umount %s"(esfn(dataset)));
