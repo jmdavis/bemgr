@@ -15,11 +15,11 @@ int realMain(string[] args)
 `bemgr - A program for managing zfs boot environments on FreeBSD or Linux
 
   bemgr activate <beName>
-  bemgr create [-e <beName> | -e <beName@snapshot>] <newBeName>
+  bemgr create [-e <beName> | -e <beName@snapshot>] <newBEName>
   bemgr create <beName@snapshot>
   bemgr destroy [-n] [-F] <beName>
   bemgr destroy [-n] [-F] <beName@snapshot>
-  bemgr export [-v] sourceBE
+  bemgr export [-k] [-v] sourceBE
   bemgr import [-v] targetBE
   bemgr list [-a] [-H] [-s]
   bemgr mount <beName> <mountpoint>

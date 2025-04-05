@@ -15,6 +15,9 @@ int doExport(string[] args)
   Exports the given boot environment to stdout. stdout must be piped or
   redirected to another program or file.
 
+  -k keeps the snapshot after the export is complete; otherwise, it will be
+     destroyed.
+
   -v displays verbose output`;
 
     import std.datetime.date : DateTime;
@@ -28,10 +31,12 @@ int doExport(string[] args)
 
     import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
+    bool keep;
     bool verbose;
     bool help;
 
     getopt(args, config.bundling,
+           "k", &keep,
            "v", &verbose,
            "help", &help);
 
@@ -65,13 +70,21 @@ int doExport(string[] args)
     {
         if(executeShell(format!`zfs list %s`(esfn(snapName))).status == 0)
         {
-           if(executeShell(format!`zfs destroy %s`(esfn(snapName))).status == 0)
-           {
-               if(verbose)
-                   stderr.writefln("\n%s destroyed", snapName);
-           }
-           else
-               stderr.writefln!"Warning: Failed to destroy snapshot for export: %s"(snapName);
+            if(keep)
+            {
+                if(verbose)
+                    stderr.writefln("\n%s was kept", snapName);
+            }
+            else
+            {
+                if(executeShell(format!`zfs destroy %s`(esfn(snapName))).status == 0)
+                {
+                    if(verbose)
+                        stderr.writefln("\n%s was destroyed", snapName);
+                }
+                else
+                    stderr.writefln!"Warning: Failed to destroy snapshot for export: %s"(snapName);
+            }
         }
         else
             stderr.writefln("Warning: %s is missing and thus cannot be destroyed", snapName);
