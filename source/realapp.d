@@ -161,7 +161,7 @@ int doRename(string[] args)
     immutable source = buildPath(poolInfo.beParent, origBE);
     immutable target = buildPath(poolInfo.beParent, newBE);
 
-    runCmd(format!"zfs rename %s %s"(esfn(source), esfn(target)));
+    runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
 
     return 0;
 }
