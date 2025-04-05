@@ -309,13 +309,13 @@ BEInfo[] getBEInfos(PoolInfo poolInfo)
     import std.exception : enforce;
     import std.format : format;
     import std.process : esfn = escapeShellFileName;
-    import std.string : indexOf, splitLines;
+    import std.string : indexOf, lineSplitter;
 
     import bemgr.util : runCmd;
 
     immutable result = runCmd(format!(DSInfo.listCmd)(esfn(poolInfo.beParent)),
                               "Error: Failed to get the list of boot environments");
-    auto dsInfos = result.splitLines().map!(a => DSInfo(a, poolInfo.mountpoints))().filter!(a => a.name != poolInfo.beParent)().array();
+    auto dsInfos = result.lineSplitter().map!(a => DSInfo(a, poolInfo.mountpoints))().filter!(a => a.name != poolInfo.beParent)().array();
 
     BEInfo[] retval;
 

@@ -44,15 +44,14 @@ bemgr destroy [-n] [-F] <beName@snapshot>
 
   -F same as above`;
 
-    import std.algorithm.searching : find;
+    import std.algorithm.iteration : splitter;
     import std.exception : enforce;
     import std.format : format;
     import std.getopt : config, getopt;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
-    import std.stdio : writeln;
-    import std.string : indexOf, splitLines;
-    import std.stdio : writefln;
+    import std.stdio : writefln, writeln;
+    import std.string : indexOf, lineSplitter;
 
     import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
 
@@ -81,10 +80,10 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         immutable snapName = buildPath(poolInfo.beParent, toDestroy);
         enforceDSExists(snapName);
 
-        auto result = runCmd(format!`zfs list -Ht filesystem,volume -o name,origin -r %s`(esfn(poolInfo.pool)));
-        auto found = result.splitLines().find!(a => a[a.indexOf('\t') + 1 .. $] == snapName)();
-        enforce(found.empty,
-                format!"Error: %s is the origin of %s"(snapName, found.front[0 .. found.front.indexOf('\t')]));
+        immutable result = runCmd(format!"zfs list -Ho clones %s"(esfn(snapName)),
+                                  "Error: Failed to get the list of clones");
+        enforce(result == "-",
+                format!"Error: %s is the origin of:\n%-(%s\n%)"(snapName, result.splitter(',')));
 
         if(dryRun)
             writefln("Snapshot to destroy: %s", snapName);
@@ -95,7 +94,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     }
 
     immutable datasetName = buildPath(poolInfo.beParent, toDestroy);
-    enforce(poolInfo.rootFS != datasetName, format!"Error: %s is the active dataset"(datasetName));
+    enforce(poolInfo.rootFS != datasetName, format!"Error: %s is the active boot environment"(toDestroy));
 
     auto di = getDestroyInfo(poolInfo, toDestroy);
 
@@ -148,15 +147,19 @@ struct DSInfo
     string name;
     string originName;
     DateTime creationTime;
-    string parent; // for snapshots only
 
-    enum listCmd = `zfs list -Hpt filesystem,snapshot,volume ` ~
+    // Only for snapshots.
+    string parent;
+    string[] clones;
+
+    enum listCmd = `zfs list -Hpt filesystem,snapshot ` ~
                    // These are the fields parsed in the constructor.
-                   `-o name,creation,origin -r %s`;
+                   `-o name,creation,origin,clones -r %s`;
 
     this(string line)
     {
-        import std.algorithm.iteration : splitter;
+        import std.algorithm.iteration : filter, splitter;
+        import std.array : array;
         import std.exception : enforce;
         import std.string : indexOf;
 
@@ -173,7 +176,8 @@ struct DSInfo
         }
         this.name = next(false);
         this.creationTime = parseDate(next(false));
-        this.originName = next(true);
+        this.originName = next(false);
+        this.clones = next(true).splitter(',').filter!(a => a != "-")().array();
 
         immutable at = name.indexOf('@');
         if(at != -1)
@@ -183,90 +187,81 @@ struct DSInfo
 
 DestroyInfo getDestroyInfo(PoolInfo poolInfo, string beName)
 {
-    import std.algorithm.iteration : filter, map;
-    import std.algorithm.searching : find, startsWith;
+    import std.algorithm.iteration : filter, map, splitter;
     import std.algorithm.sorting : sort;
-    import std.array : array;
-    import std.datetime.date : DateTime;
     import std.exception : enforce;
     import std.format : format;
     import std.path : buildPath;
     import std.process : esfn = escapeShellFileName;
-    import std.string : representation, splitLines;
+    import std.range : walkLength;
+    import std.string : lineSplitter;
 
     import bemgr.util : runCmd;
 
-    immutable result = runCmd(format!(DSInfo.listCmd)(esfn(poolInfo.pool)),
-                              "Error: Failed to get the list of datasets and snapshots");
     immutable datasetName = buildPath(poolInfo.beParent, beName);
-    immutable snapStart = datasetName ~ "@";
-    immutable childStart = datasetName ~ "/";
-
     DSInfo dataset;
-    DSInfo[] childSnapshots;
-    DSInfo[] clones;
+    DSInfo[] snapshots;
 
-    foreach(e; result.splitLines().map!DSInfo().filter!(a => a.name != poolInfo.beParent)())
     {
-        if(e.name == datasetName)
-            dataset = e;
-        else if(!e.parent.empty)
+        immutable result = runCmd(format!(DSInfo.listCmd)(esfn(datasetName)),
+                                  "Error: Failed to get the list of datasets and snapshots");
+
+        foreach(e; result.lineSplitter().map!DSInfo())
         {
-            if(e.parent == datasetName)
-                childSnapshots ~= e;
+            if(e.name == datasetName)
+                dataset = e;
+            else if(e.parent == datasetName)
+                snapshots ~= e;
+            else
+                throw new Exception(format!"Error: %s has child datasets"(datasetName));
         }
-        else if(e.name.representation.startsWith(childStart.representation))
-            throw new Exception(format!"Error: %s has child datasets"(datasetName));
-        else if(!e.originName.empty)
-            clones ~= e;
     }
 
-    enforce(dataset !is DSInfo.init, format!"Error: Boot environment does not exist: %s"(beName));
+    snapshots.sort!((a, b) => a.creationTime > b.creationTime)();
 
-    immutable canDestroyOrigin = dataset.originName != "=" && clones.find!(a => a.originName == dataset.originName)().empty;
-    immutable originToDestroy = canDestroyOrigin ? dataset.originName : "";
-    auto clonesAtRisk = clones.filter!(a => a.originName.representation.startsWith(snapStart.representation))().array();
+    auto retval = DestroyInfo(dataset.name);
 
-    if(clonesAtRisk.empty)
-        return DestroyInfo(datasetName, originToDestroy);
-
-    static struct CloneInfo
+    if(dataset.originName != "-")
     {
-        DSInfo clone;
-        DateTime originCreationTime;
+        immutable result = runCmd(format!"zfs list -Ho clones %s"(esfn(dataset.originName)),
+                                  "Error: Failed to get the list of clones");
+        auto clones = result.splitter(',').filter!(a => a != "-")();
+        immutable numClones = walkLength(clones);
+        enforce(numClones > 0, "Error: Encountered logic bug getting information on clones");
+        if(walkLength(clones) == 1)
+            retval.origin = dataset.originName;
     }
 
-    CloneInfo[] cloneInfos;
-
-    foreach(e; childSnapshots)
+    foreach(i, snap; snapshots)
     {
-        auto found = clonesAtRisk.find!(a => a.originName == e.name)();
-        if(found.empty)
-            continue;
-        cloneInfos ~= CloneInfo(found.front, e.creationTime);
-    }
+        if(!snap.clones.empty)
+        {
+            retval.toPromote ~= snap.clones.front;
 
-    // Realistically, there should only be one snapshot with a given creation
-    // time on a dataset, but AFAIK, that's not guaranteeed, since snapshots
-    // are near instantaneous, and the resolution of the creation time is one
-    // second. So, it is technically possible that there will be multiple
-    // snapshots with the same creation time which have clones, and if one no
-    // newer snapshots have clones, then we have no way of knowing which one to
-    // promote in order to move all of the snapshots related to clones from the
-    // BE dataset that we're trying to destroy. So, we're just going to promote
-    // all of them. This will probably never happen in practice, but since it's
-    // technically possible, we're going to account for it.
-    auto sorted = cloneInfos.sort!((a, b) => a.originCreationTime > b.originCreationTime)();
-    auto latest = sorted.front.originCreationTime;
-    string[] toPromote;
+            // Realistically, there should only be one snapshot with a given
+            // creation time on a dataset, but AFAIK, that's not guaranteeed,
+            // since snapshots are near instantaneous, and the resolution of
+            // the creation time is one second. So, it is technically possible
+            // that there will be multiple snapshots with the same creation
+            // time which have clones, and if there are multiple snapshots with
+            // clones which have the latest creation time out of any snapshots
+            // with clones, then we have no way of knowing which one to promote
+            // in order to move all of the snapshots related to clones from the
+            // BE dataset that we're trying to destroy. So, we're just going to
+            // promote all of them. This will probably never happen in
+            // practice, but since it's technically possible, we're going to
+            // account for it.
+            immutable next = i + 1;
+            if(next != snapshots.length && snapshots[next].creationTime == snap.creationTime)
+            {
+                auto clones = snapshots[next].clones;
+                if(!clones.empty)
+                    retval.toPromote ~= clones.front;
+            }
 
-    foreach(e; sorted)
-    {
-        if(e.originCreationTime == latest)
-            toPromote ~= e.clone.name;
-        else
             break;
+        }
     }
 
-    return DestroyInfo(datasetName, originToDestroy, toPromote);
+    return retval;
 }

@@ -259,7 +259,7 @@ Mountpoint[] getMounted()
     import std.algorithm.iteration : map;
     import std.array : array;
     import std.format : format;
-    import std.string : splitLines;
+    import std.string : lineSplitter;
 
-    return runCmd("zfs mount").splitLines().map!Mountpoint().array();
+    return runCmd("zfs mount").lineSplitter().map!Mountpoint().array();
 }
