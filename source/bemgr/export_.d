@@ -20,8 +20,6 @@ int doExport(string[] args)
 
   -v displays verbose output`;
 
-    import std.datetime.date : DateTime;
-    import std.datetime.systime : Clock;
     import std.exception : enforce;
     import std.format : format;
     import std.getopt : config, getopt;
@@ -29,7 +27,7 @@ int doExport(string[] args)
     import std.process : esfn = escapeShellFileName, executeShell, spawnShell, wait;
     import std.stdio : stderr, writeln;
 
-    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getCurrTimeWithOffset, getPoolInfo, runCmd;
 
     bool keep;
     bool verbose;
@@ -52,7 +50,7 @@ int doExport(string[] args)
 
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
-    immutable snapName = format!"%s@%s"(dataset, (cast(DateTime)Clock.currTime()).toISOExtString());
+    immutable snapName = format!"%s@%s"(dataset, getCurrTimeWithOffset());
 
     enforceDSExists(dataset);
 

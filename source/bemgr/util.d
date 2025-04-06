@@ -232,6 +232,25 @@ void enforceDSExists(string dsName)
     runCmd(format!`zfs list %s`(esfn(dsName)), format!"Error: %s does not exist"(dsName));
 }
 
+string getCurrTimeWithOffset()
+{
+    import core.time : abs, Duration;
+    import std.datetime.date : DateTime;
+    import std.datetime.systime : Clock;
+    import std.format : format;
+
+    immutable st = Clock.currTime();
+    immutable dt = cast(DateTime)Clock.currTime();
+    immutable offset = st.utcOffset;
+    immutable absOffset = abs(offset);
+
+    int hours;
+    int minutes;
+    absOffset.split!("hours", "minutes")(hours, minutes);
+
+    return format!"%s%s%02d:%02d"(dt.toISOExtString(), offset < Duration.zero ? "-" : "+", hours, minutes);
+}
+
 private:
 
 struct Mountpoint

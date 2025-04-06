@@ -29,8 +29,6 @@ bemgr create <beName@snapshot>
   dataset and name the snapshot "bar", so if "zroot/ROOT" were the parent of the
   BE datasets, then the snapshot would be "zroot/ROOT/foo@bar".`;
 
-    import std.datetime.date : DateTime;
-    import std.datetime.systime : Clock;
     import std.exception : enforce;
     import std.format : format;
     import std.getopt : config, getopt;
@@ -39,7 +37,7 @@ bemgr create <beName@snapshot>
     import std.stdio : writeln;
     import std.string : indexOf;
 
-    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getCurrTimeWithOffset, getPoolInfo, runCmd;
 
     string origin;
     bool help;
@@ -98,13 +96,13 @@ The characters allowed in boot environment names are:` ~ allowed;
 
     if(origin.empty)
     {
-        origin = format!"%s@%s"(poolInfo.rootFS, (cast(DateTime)Clock.currTime()).toISOExtString());
+        origin = format!"%s@%s"(poolInfo.rootFS, getCurrTimeWithOffset());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else if(origin.indexOf('@') == -1)
     {
         enforceDSExists(origin);
-        origin = format!"%s/%s@%s"(poolInfo.beParent, origin, (cast(DateTime)Clock.currTime()).toISOExtString());
+        origin = format!"%s/%s@%s"(poolInfo.beParent, origin, getCurrTimeWithOffset());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else
