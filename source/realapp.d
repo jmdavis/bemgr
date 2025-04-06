@@ -14,6 +14,7 @@ int realMain(string[] args)
     immutable helpMsg =
 `bemgr - A program for managing zfs boot environments on FreeBSD or Linux
 
+  begmr --help
   bemgr activate <beName>
   bemgr create [-e <beName> | -e <beName@snapshot>] <newBEName>
   bemgr create <beName@snapshot>

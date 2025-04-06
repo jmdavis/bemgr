@@ -14,7 +14,7 @@ import bemgr.util : PoolInfo;
 int doDestroy(string[] args)
 {
     enum helpMsg =
-`bemgr destroy [-n] [-F] <beName>
+`bemgr destroy [-k] [-n] [-F] <beName>
 
   Destroys the given boot environment.
 
@@ -24,6 +24,9 @@ int doDestroy(string[] args)
   is not the origin of another dataset, then the origin will also be destroyed.
 
   Note that unlike beadm, there is no confirmation.
+
+  -k If the BE dataset is a clone, then keep its origin rather than destroying
+     it.
 
   -n Do a dry run. This will print out what would be destroyed and what
      what would be promoted if -n were not used.
@@ -57,9 +60,11 @@ bemgr destroy [-n] [-F] <beName@snapshot>
 
     bool dryRun;
     bool force;
+    bool keep;
     bool help;
 
     getopt(args, config.bundling,
+           "keep", &keep,
            "n", &dryRun,
            "f", &force,
            "help", &help);
@@ -110,7 +115,10 @@ bemgr destroy [-n] [-F] <beName@snapshot>
 
         if(!di.origin.empty)
         {
-            writeln("Origin Snapshot to be Destroyed:");
+            if(keep)
+                writeln("Origin Snapshot to be Kept:");
+            else
+                writeln("Origin Snapshot to be Destroyed:");
             writefln("  %s\n", di.origin);
         }
 
@@ -122,7 +130,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         foreach(e; di.toPromote)
             runCmd(format!"zfs promote %s"(esfn(e)));
         runCmd(format!"zfs destroy%s -r %s"(force ? " -f" : "", esfn(di.dataset)));
-        if(!di.origin.empty)
+        if(!di.origin.empty && !keep)
             runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(di.origin)));
     }
 
