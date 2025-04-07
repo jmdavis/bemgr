@@ -134,7 +134,7 @@ so that it does not get mounted automatically.
 The
 .Em bootfs
 property on the pool will then tell the boot manager which boot environment to
-mount as root by default.
+.No mount as root by default (e.g. Sy bootfs=zroot/ROOT/default Ns ).
 .Pp
 .Nm
 expects that boot environments will not have any child datasets.
@@ -152,7 +152,7 @@ So, when you switch between boot environments, those directories are unchanged.
 .Pp
 So, common usage would be to run
 .Sy bemgr\ create
-from the currently active boot environment to create a new boot environment
+to create a new boot environment from the currently active boot environment
 before making large changes to the OS (e.g. updating the packages which are
 installed or doing a major OS upgrade).
 That way, if something goes wrong, it's possible to restore the previous state
@@ -160,8 +160,8 @@ of the OS by switching to the previous boot environment.
 .Pp
 .Sy bemgr\ activate
 is used to switch to a different boot environment the next time that the
-computer reboots (and a boot managers will typically give the ability to
-manually select a boot environment other than the default to boot from).
+computer reboots (and boot managers will typically give the ability to manually
+select a boot environment other than the default to boot from).
 .Sh COMMANDS
 .Bl -tag -width 0
 .It Xo
@@ -294,9 +294,7 @@ out what would have been promoted or destroyed if
 .Fl n
 hadn't been used.
 .Pp
-Note that unlike
-.Sy beadm Ns ,
-there is no confirmation.
+Note that there is no confirmation.
 So, anyone feeling paranoid about making sure that they're destroying what they
 intend to should use
 .Fl n
@@ -312,7 +310,7 @@ to keep the origin in the case where the BE dataset is a clone; otherwise, it
 will be destroyed as long as it is not the origin of another dataset.
 .Pp
 Normally, if any of what's being destroyed is mounted, it will be unmounted and
-estroyed without a problem, but if it's actively in use, then zfs may refuse to
+destroyed without a problem, but if it's actively in use, then zfs may refuse to
 unmount it.
 .Fl F
 can be used to forcefully unmount what's being destroyed if that occurs (or you
@@ -327,33 +325,25 @@ can't be used to destroy the currently running OS.
 In more detail:
 .Bl -enum -width 1
 .It
-If any of the boot environment's snapshots are the origin of another dataset,
-then the dataset of the newest snapshot with a clone will be promoted, shifting
-the origin and the other snapshots which are older than it to the clone that's
-promoted, meaning that they will not be destroyed.
+If any of the boot environment's snapshots are the origin of another dataset
+(i.e. a dataset is a clone of that snapshot), then a clone of the newest
+snapshot which has a clone will be promoted, shifting that origin snapshot and
+the other snapshots which are older than it to the clone that's promoted,
+meaning that they will not be destroyed.
 .It
 If the boot environment has an origin (and thus is a clone), and that origin
-snapshot is not the origin of another dataset, then the origin snapshot will be
-destroyed.
+snapshot is not the origin of another dataset, then that origin snapshot will
+be destroyed.
 .It
 The dataset itself and any of its remaining snapshots will be destroyed.
 .El
 .Pp
-This behavor differs at least slightly from that of
-.Sy bectl
-and
-.Sy beadm Ns ,
-but without digging through the source code of both, it would be difficult to
-say how exactly.
-However, the clear differences are that
-.Sy bectl
-will not destroy origins by default, and
-.Sy beadm
-will ask the user before destroying origin snapshots.
+So,
 .Nm
-destroys what it destroys without asking \- including origins \- but it promotes
-clones where necessary so that the BE that it was told to destroy can be
-destroyed.
+destroys what it destroys without confirmation \- including the origin snapshot
+of the given dataset \- but it promotes clones where necessary so that the BE
+that it was told to destroy can be destroyed without destroying any other
+datasets.
 The idea is that no cruft will be left behind, and the user will not be nagged,
 but
 .Fl n
@@ -408,7 +398,7 @@ etc.
 .Pp
 .Fl k
 makes it so that the snapshot is kept after the export has completed;
-otherwise, it will be destroyed.
+otherwise, the snapshot will be destroyed.
 .Pp
 .Fl v
 makes the output verbose.
@@ -496,7 +486,8 @@ for a BE's dataset).
 .Pp
 The currently active BE will show
 .Pa /
-as its mountpoint, and any other BE which shows a mountpoint other than `"\-"`
+as its mountpoint, and any other BE which shows a mountpoint other than
+.Sy Dq \-
 will be showing its current mountpoint and not the
 .Em mountpoint
 property of the dataset.
@@ -539,36 +530,18 @@ property of the dataset minus the space for its snapshots which are the origin
 of another BE's dataset.
 .Pp
 If the BE's dataset is a clone, then the calculation is the same but under the
-assumption that it's promoted first (which would potentially move some
-snapshots currently under another dataset to the dataset being promoted, since
-snapshots older than the origin snapshot get moved to the dataset being
-promoted when it's promoted). So, some snapshots besides the origin or those
-currently on that dataset could be included.
+assumption that it's promoted first (which would move some snapshots currently
+under another dataset to the dataset being promoted, since the origin snapshot
+and snapshots older than the origin snapshot get moved to the dataset being
+promoted when it's promoted).
+So, some snapshots besides the origin or those currently on that dataset could
+be included.
 But regardless, no snapshots which are the origin of another BE's dataset are
 included in
 .Em If Last
 for any BE, since those snapshots are destroyed when
 .Sy bemgr destroy
 is used on those BEs.
-.Pp
-This calculation is somewhat different from the calculation for
-.Em Space
-used with
-.Sy bectl Ns Ap s and
-.Sy beadm Ns Ap s
-.Fl D
-flag (which is also intended to show the space that the BE will take up if all
-of the other BEs are destroyed).
-.Sy bectl
-shows a higher number, presumably because it does not destroy origin snapshots
-by default, whereas
-.Sy beadmn
-seems to show the
-.Em referenced
-property of the BE's dataset and thus is equivalent to the
-.Em Referenced
-column from
-.Sy bemgr\ list Ns .
 .It Created
 This is the
 .Em creation
@@ -749,7 +722,7 @@ its own, that's the entire list even with
 whereas if it had additional snapshots, they'd be listed after the origin.
 For instance, if
 .Em 2025\-02\-04_update
-were activated, then its output from
+were activated (and thus its dataset was promoted), then its output from
 .Sy bemgr\ list\ \-as
 would become
 .Bd -literal
@@ -762,7 +735,7 @@ would become
 .Pp
 since the origin snapshot and the snapshots older than it would be moved to
 .Pa zroot/ROOT/2025\-02\-04_update
-if it's promoted.
+when it's promoted.
 .It Xo
 .Cm mount
 .Ar beName
@@ -800,6 +773,13 @@ then
 .Sy bemgr\ rename\ foo\ bar
 would be equivalent to
 .Sy zfs\ rename\ \-u\ zroot/ROOT/foo\ zroot/ROOT/bar Ns .
+.Pp
+In addition, if the BE in the
+.Sy bootfs
+zpool property is the one that's renamed (i.e. the BE that will be active when
+the system next boots), then the
+.Sy bootfs
+zpool property is updated accordingly.
 .It Xo
 .Cm umount
 .Op Fl f

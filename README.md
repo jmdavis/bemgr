@@ -36,7 +36,8 @@ the rescue as it often does with ZFS.
 Each boot environment should have its `mountpoint` property set to `/`, and its
 `canmount` property should be set to `noauto` so that it does not get mounted
 automatically. The `bootfs` property on the pool will then tell the boot
-manager which boot environment to mount as root by default.
+manager which boot environment to mount as root by default (e.g.
+`bootfs=zroot/ROOT/default`)
 
 `bemgr` expects that boot environments will not have any child datasets. Other
 datasets can of course be mounted on top of the boot environment, but they
@@ -48,14 +49,14 @@ environments - such as /home or /var/log - then have their own datasets which
 mount on top of the boot environment. So, when you switch between boot
 environments, those directories are unchanged.
 
-So, common usage would be to run `bemgr create` from the currently active boot
-environment to create a new boot environment before making large changes to the
-OS (e.g. updating the packages which are installed or doing a major OS
-upgrade). That way, if something goes wrong, it's possible to restore the
-previous state of the OS by switching to the previous boot environment.
+So, common usage would be to run `bemgr create` to create a new boot
+environment from the currently active boot environment before making large
+changes to the OS (e.g. updating the packages which are installed or doing a
+major OS upgrade). That way, if something goes wrong, it's possible to restore
+the previous state of the OS by switching to the previous boot environment.
 
 `bemgr activate` is used to switch to a different boot environment the next
-time that the computer reboots (and a boot managers will typically give the
+time that the computer reboots (and boot managers will typically give the
 ability to manually select a boot environment other than the default to boot
 from).
 

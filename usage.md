@@ -78,10 +78,10 @@ other dataset has the same origin).
 it simply prints out what would have been promoted or destroyed if `-n` hadn't
 been used.
 
-Note that unlike `beadm`, there is no confirmation. So, anyone feeling paranoid
-about making sure that they're destroying what they intend to should use `-n`
-to verify, but without it, `bemgr destroy` will just destroy what it's supposed
-to without nagging about stuff like whether the origin should be destroyed.
+Note that there is no confirmation. So, anyone feeling paranoid about making
+sure that they're destroying what they intend to should use `-n` to verify, but
+without it, `bemgr destroy` will just destroy what it's supposed to without
+nagging about stuff like whether the origin should be destroyed.
 
 `-k` tells `bemgr` to keep the origin in the case where the BE dataset is a
 clone; otherwise, it will be destroyed as long as it is not the origin of
@@ -96,26 +96,24 @@ active. So, `bemgr destroy` can't be used to destroy the currently running OS.
 
 In more detail:
 
-1. If any of the boot environment's snapshots are the origin of another
-   dataset, then the dataset of the newest snapshot with a clone will be
-   promoted, shifting the origin and the other snapshots which are older than
-   it to the clone that's promoted, meaning that they will not be destroyed.
+1. If any of the boot environment's snapshots are the origin of another dataset
+   (i.e. a dataset is a clone of that snapshot), then a clone of the newest
+   snapshot which has a clone will be promoted, shifting that origin snapshot
+   and the other snapshots which are older than it to the clone that's
+   promoted, meaning that they will not be destroyed.
 
 2. If the boot environment has an origin (and thus is a clone), and that origin
-   snapshot is not the origin of another dataset, then the origin snapshot will
+   snapshot is not the origin of another dataset, then that origin snapshot will
    be destroyed.
 
 3. The dataset itself and any of its remaining snapshots will be destroyed.
 
-This behavor differs at least slightly from that of `bectl` and `beadm`, but
-without digging through the source code of both, it would be difficult to say
-how exactly. However, the clear differences are that `bectl` will not destroy
-origins by default, and `beadm` will ask the user before destroying origin
-snapshots. `bemgr` destroys what it destroys without asking - including origins
-- but it promotes clones where necessary so that the BE that it was told to
-destroy can be destroyed. The idea is that no cruft will be left behind, and
-the user will not be nagged, but `-n` provides a way to preview the results if
-desired.
+So, `bemgr` destroys what it destroys without asking for confirmation -
+including the origin snapshot of the given dataset - but it promotes clones
+where necessary so that the BE that it was told to destroy can be destroyed
+without destroying any other datasets. The idea is that no cruft will be left
+behind, and the user will not be nagged, but `-n` provides a way to preview the
+results if desired.
 
 # bemgr destroy
 
@@ -145,7 +143,7 @@ Takes a snapshot of the given BE and does `zfs send` on it to stdout so that it
 can be piped or redirected to a file, or to ssh, etc.
 
 `-k` makes it so that the snapshot is kept after the export has completed;
-otherwise, it will be destroyed.
+otherwise, the snapshot will be destroyed.
 
 `-v` makes the output verbose.
 
@@ -250,22 +248,13 @@ of another BE's dataset.
   If the BE's dataset is a clone, then the calculation is the same but under the
 assumption that it's
 [promoted](https://openzfs.github.io/openzfs-docs/man/v2.3/8/zfs-promote.8.html#zfs-promote-8)
-first (which would potentially move some snapshots currently under another
-dataset to the dataset being promoted, since snapshots older than the origin
-snapshot get moved to the dataset being promoted when it's promoted). So, some
-snapshots besides the origin or those currently on that dataset could be
-included. But regardless, no snapshots which are the origin of another BE's
+first (which would move some snapshots currently under another dataset to the
+dataset being promoted, since the origin snapshot and snapshots older than the
+origin snapshot get moved to the dataset being promoted when it's promoted).
+So, some snapshots besides the origin or those currently on that dataset could
+be included. But regardless, no snapshots which are the origin of another BE's
 dataset are included in `If Last` for any BE, since those snapshots are
 destroyed when `bemgr destroy` is used on those BEs.
-
-  This calculation is somewhat different from the calculation for `Space` used
-with `bectl`'s and `beadm`'s `-D` flag (which is also intended to show the
-space that the BE will take up if all of the other BEs are destroyed). `bectl`
-shows a higher number, presumably because it does not destroy origin snapshots
-by default, whereas `beadmn` seems to show the
-[`referenced`](https://openzfs.github.io/openzfs-docs/man/master/7/zfsprops.7.html#referenced)
-property of the BE's dataset and thus is equivalent to the `Referenced` column
-from `bemgr list`.
 
 * _Created_
 
@@ -424,7 +413,8 @@ dataset for that BE, and `zroot/ROOT/default@2025-02-04-19:22:18` is the origin
 snapshot of that dataset. Since the dataset has no snapshots of its own, that's
 the entire list even with `-s`, whereas if it had additional snapshots, they'd
 be listed after the origin. For instance, if `2025-02-04_update` were
-activated, then its output from `bemgr list -as` would become
+activated (and thus its dataset was promoted, then its output from `bemgr list
+-as` would become
 
 ```
 2025-02-04_update
@@ -435,7 +425,7 @@ activated, then its output from `bemgr list -as` would become
 ```
 
 since the origin snapshot and the snapshots older than it would
-be moved to `zroot/ROOT/2025-02-04_update` if it's promoted.
+be moved to `zroot/ROOT/2025-02-04_update` when it's promoted.
 
 # bemgr mount
 
@@ -462,6 +452,10 @@ This renames the given boot environment. It has no effect on mounting.
 For instance, if the parent dataset of the BEs is `zroot/ROOT`, then
 `bemgr rename foo bar` would be equivalent to
 `zfs rename -u zroot/ROOT/foo zroot/ROOT/bar`.
+
+In addition, if the BE in the `bootfs` zpool property is the one that's renamed
+(i.e. the BE that will be active when the system next boots), then the `bootfs`
+zpool property is updated accordingly.
 
 # bemgr umount
 
