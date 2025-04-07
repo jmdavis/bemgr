@@ -50,10 +50,9 @@ int doExport(string[] args)
 
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
-    immutable snapName = format!"%s@%s"(dataset, getCurrTimeWithOffset());
-
     enforceDSExists(dataset);
 
+    immutable snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeWithOffset());
     runCmd(format!`zfs snap %s`(esfn(snapName)));
     if(verbose)
         stderr.writefln("Created snapshot: %s\n", snapName);

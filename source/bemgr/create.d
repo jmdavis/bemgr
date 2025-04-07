@@ -96,13 +96,13 @@ The characters allowed in boot environment names are:` ~ allowed;
 
     if(origin.empty)
     {
-        origin = format!"%s@%s"(poolInfo.rootFS, getCurrTimeWithOffset());
+        origin = format!"%s@bemgr_%s"(poolInfo.rootFS, getCurrTimeWithOffset());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else if(origin.indexOf('@') == -1)
     {
         enforceDSExists(origin);
-        origin = format!"%s/%s@%s"(poolInfo.beParent, origin, getCurrTimeWithOffset());
+        origin = format!"%s/%s@bemgr_%s"(poolInfo.beParent, origin, getCurrTimeWithOffset());
         runCmd(format!"zfs snap %s"(esfn(origin)));
     }
     else
