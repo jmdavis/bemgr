@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Jonathan M Davis"
+	],
+	"copyright": "Copyright © 2025, Jonathan M Davis",
+	"description": "Integration tests for bemgr.",
+	"license": "BSL-1.0",
+	"name": "integration_tests"
+}

@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/integration_tests
+integration_tests.so
+integration_tests.dylib
+integration_tests.dll
+integration_tests.a
+integration_tests.lib
+integration_tests-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
