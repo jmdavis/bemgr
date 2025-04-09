@@ -64,11 +64,11 @@ string zpoolGet(string prop, string pool)
     return runCmd(format!"zpool get -Ho value %s %s"(prop, pool));
 }
 
-string zfsGet(string prop, string pool)
+string zfsGet(string prop, string dataset)
 {
     import std.format : format;
 
-    return runCmd(format!"zfs get -Ho value %s %s"(prop, pool));
+    return runCmd(format!"zfs get -Ho value %s %s"(prop, dataset));
 }
 
 string runCmd(string cmd)
