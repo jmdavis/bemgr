@@ -77,7 +77,8 @@ bemgr create <beName@snapshot>
 `Error: Cannot create a snapshot with the name "%s".
 The characters allowed in boot environment snapshots names are:` ~ allowed;
 
-            enforce(validName(newBE), format!fmt(newBE));
+            immutable snapName = newBE[at + 1 .. $];
+            enforce(validName(snapName), format!fmt(snapName));
             runCmd(format!"zfs snap %s"(esfn(buildPath(poolInfo.beParent, newBE))));
 
             return 0;
