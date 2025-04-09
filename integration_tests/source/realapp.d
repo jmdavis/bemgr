@@ -201,11 +201,7 @@ unittest
     assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
     assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
 
-    auto after = zfsList!"name"("zroot").array();
-    after.sort!((a, b) => a.name < b.name)();
-
-    auto diff = diffNameList(startList, after);
-
+    auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.length == 4);
     assert(diff.extra[0].name == "zroot/ROOT/bar");
@@ -275,11 +271,7 @@ unittest
     assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
     assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
 
-    auto after = zfsList!"name"("zroot").array();
-    after.sort!((a, b) => a.name < b.name)();
-
-    auto diff = diffNameList(startList, after);
-
+    auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.length == 4);
     assert(diff.extra[0].name == "zroot/ROOT/bar");
@@ -351,11 +343,7 @@ unittest
     assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
     assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
 
-    auto after = zfsList!"name"("zroot").array();
-    after.sort!((a, b) => a.name < b.name)();
-
-    auto diff = diffNameList(startList, after);
-
+    auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.length == 3);
     assert(diff.extra[0].name == "zroot/ROOT/bar");
@@ -410,11 +398,7 @@ unittest
     assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
     assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
 
-    auto after = zfsList!"name"("zroot").array();
-    after.sort!((a, b) => a.name < b.name)();
-
-    auto diff = diffNameList(startList, after);
-
+    auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.length == 2);
     assert(diff.extra[0].name == "zroot/ROOT/default@bar");
@@ -426,4 +410,113 @@ unittest
     assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
     assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
     assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+}
+
+// basic functionality of bemgr destroy beName
+unittest
+{
+    import std.algorithm.searching : startsWith;
+    import std.algorithm.sorting : sort;
+    import std.array : array;
+
+    {
+        bemgr("create", "foo");
+        bemgr("destroy", "foo");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty );
+    }
+    {
+        bemgr("create", "foo");
+        bemgr("create", "bar");
+        immutable barOrigin = zfsList!"origin"("zroot/ROOT/bar", false).front.origin;
+
+        bemgr("destroy", "foo");
+
+        {
+            auto result = zfsList!("name", "origin", "clones")("zroot/ROOT").array();
+            result.sort!((a, b) => a.name < b.name)();
+            assert(result.length == 4);
+            assert(result[0].name == "zroot/ROOT");
+            assert(result[1].name == "zroot/ROOT/bar");
+            assert(result[1].origin == barOrigin);
+            assert(result[2].name == "zroot/ROOT/default");
+            assert(result[3].name == barOrigin);
+            assert(result[3].clones == "zroot/ROOT/bar");
+        }
+
+        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+        assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
+        assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 2);
+        assert(diff.extra[0].name == "zroot/ROOT/bar");
+        assert(diff.extra[1].name == barOrigin);
+
+        bemgr("destroy", "bar");
+    }
+
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// basic functionality of bemgr destroy beName@snapshot
+unittest
+{
+    import std.algorithm.searching : startsWith;
+    import std.algorithm.sorting : sort;
+    import std.array : array;
+
+    {
+        bemgr("create", "default@foo");
+        bemgr("destroy", "default@foo");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty );
+    }
+    {
+        bemgr("create", "default@foo");
+        bemgr("create", "default@bar");
+        bemgr("destroy", "default@foo");
+
+        {
+            auto result = zfsList!("name", "clones")("zroot/ROOT").array();
+            result.sort!((a, b) => a.name < b.name)();
+            assert(result.length == 3);
+            assert(result[0].name == "zroot/ROOT");
+            assert(result[1].name == "zroot/ROOT/default");
+            assert(result[2].name == "zroot/ROOT/default@bar");
+            assert(result[2].clones == "-");
+        }
+
+        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 1);
+        assert(diff.extra[0].name == "zroot/ROOT/default@bar");
+
+        bemgr("destroy", "default@bar");
+    }
+
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }

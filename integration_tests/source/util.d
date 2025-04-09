@@ -52,7 +52,7 @@ auto zfsList(props...)(string dsName, bool recursive = true)
     import std.string : lineSplitter;
 
 
-    auto result = runCmd(format!"zfs list -t all -Hpo %-(%s,%)%s %s"(only(props), recursive ? " -r" : "", dsName));
+    auto result = runCmd(format!"zfs list -t all -Hpo %-(%s,%)%s %s"(only(props), recursive ? " -r" : "", esfn(dsName)));
 
     return result.lineSplitter().map!(ListLine!props.parse)();
 }
