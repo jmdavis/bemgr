@@ -234,28 +234,39 @@ void enforceDSExists(string dsName)
 
 string createSnapshotWithTime(string dataset)
 {
-    import core.thread : Thread;
-    import core.time : seconds;
     import std.format : format;
-    import std.process : esfn = escapeShellFileName, executeShell;
+    import std.process : esfn = escapeShellFileName;
 
-    auto snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeWithOffset());
-    if(executeShell(format!`zfs list %s`(esfn(snapName))).status != 0)
-    {
-        runCmd(format!"zfs snap %s"(esfn(snapName)));
-        return snapName;
-    }
+    immutable snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeWithOffset());
 
-    // This second attempt really shouldn't be necessary under normal
-    // circumstances, since it should only happen when bemgr create or bemgr
-    // export is called in extremely quick succession, which really shouldn't
-    // happen in practice. It does happen with the integration tests though.
-    Thread.sleep(seconds(1));
-
-    snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeWithOffset());
     runCmd(format!"zfs snap %s"(esfn(snapName)));
 
     return snapName;
+}
+
+// This is required, becuse zfs currently has a bug where promoting a clone
+// will sometimes result in it staying a clone when promoted (reshuffling of
+// snapshots was done, but it was incomplete). An easy situation where this can
+// occur is if a clone is made from a snapshot of a clone.
+// https://github.com/openzfs/zfs/issues/15587
+// So, to work around this issue, we're going to repeatedly promote the dataset
+// until it's no longer a clone.
+void promote(string dataset)
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable promote = format!"zfs promote %s"(esfn(dataset));
+    immutable getOrigin = format!"zfs get -Ho value origin %s"(esfn(dataset));
+
+    foreach(i; 0 .. 100)
+    {
+        runCmd(promote);
+        if(runCmd(getOrigin) == "-")
+            return;
+    }
+
+    throw new Exception(format!"Error: Failed to promote %s\nSee https://github.com/openzfs/zfs/issues/15587"(dataset));
 }
 
 private:
@@ -276,7 +287,7 @@ string getCurrTimeWithOffset()
     int minutes;
     absOffset.split!("hours", "minutes")(hours, minutes);
 
-    return format!"%s%s%02d:%02d"(dt.toISOExtString(), offset < Duration.zero ? "-" : "+", hours, minutes);
+    return format!"%s.%03d%s%02d:%02d"(dt.toISOExtString(), st.fracSecs.total!"msecs", offset < Duration.zero ? "-" : "+", hours, minutes);
 }
 
 struct Mountpoint

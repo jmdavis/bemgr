@@ -81,7 +81,7 @@ int doActivate(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : getPoolInfo, promote, runCmd;
 
     bool help;
 
@@ -118,7 +118,7 @@ int doActivate(string[] args)
     immutable origin = runCmd(format!"zfs list -Ho origin %s"(esfn(dataset)),
                               format!"Error: %s does not exist"(dataset));
     if(origin != "-")
-        runCmd(format!"zfs promote %s"(esfn(dataset)));
+        promote(dataset);
 
     runCmd(format!"zpool set bootfs=%s %s"(esfn(dataset), esfn(poolInfo.pool)));
 

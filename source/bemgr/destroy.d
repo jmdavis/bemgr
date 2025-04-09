@@ -56,7 +56,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     import std.stdio : writefln, writeln;
     import std.string : indexOf, lineSplitter;
 
-    import bemgr.util : enforceDSExists, getPoolInfo, runCmd;
+    import bemgr.util : enforceDSExists, getPoolInfo, promote, runCmd;
 
     bool dryRun;
     bool force;
@@ -129,10 +129,15 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     else
     {
         foreach(e; di.toPromote)
-            runCmd(format!"zfs promote %s"(esfn(e)));
+            promote(e);
         runCmd(format!"zfs destroy%s -r %s"(force ? " -f" : "", esfn(di.dataset)));
         if(!di.origin.empty && !keep)
             runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(di.origin)));
+
+        // Just in case promoting any clones turned the next active BE into a
+        // clone.
+        if(!di.toPromote.empty)
+            promote(poolInfo.bootFS);
     }
 
     return 0;
