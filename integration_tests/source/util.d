@@ -57,6 +57,20 @@ auto zfsList(props...)(string dsName, bool recursive = true)
     return result.lineSplitter().map!(ListLine!props.parse)();
 }
 
+string zpoolGet(string prop, string pool)
+{
+    import std.format : format;
+
+    return runCmd(format!"zpool get -Ho value %s %s"(prop, pool));
+}
+
+string zfsGet(string prop, string pool)
+{
+    import std.format : format;
+
+    return runCmd(format!"zfs get -Ho value %s %s"(prop, pool));
+}
+
 string runCmd(string cmd)
 {
     import std.exception : enforce;
@@ -67,6 +81,13 @@ string runCmd(string cmd)
     immutable result = executeShell(cmd);
     enforce(result.status == 0, result.output);
     return result.output.strip();
+}
+
+string bemgr(string cmd, string args)
+{
+    import std.format : format;
+
+    return runCmd(format!"../bemgr %s %s"(cmd, args));
 }
 
 auto getCurrDSList()
@@ -87,7 +108,7 @@ struct Diff(T)
 }
 
 // assumes sorted
-auto diffNameList(T)(T[] prev, T[] curr)
+auto diffNameList(T)(const(T)[] prev, const(T)[] curr)
     if(isInstanceOf!(ListLine, T) && is(typeof(T.init.name)))
 {
     Diff!T retval;
@@ -182,4 +203,34 @@ unittest
     test([LL("a"), LL("b"), LL("c")], [LL("a"), LL("d")], [LL("b"), LL("c")], [LL("d")]);
     test([LL("a"), LL("b"), LL("c")], [LL("b"), LL("d")], [LL("a"), LL("c")], [LL("d")]);
     test([LL("a"), LL("b"), LL("c")], [LL("c"), LL("d")], [LL("a"), LL("b")], [LL("d")]);
+}
+
+struct Mountpoint
+{
+    string dsName; // dataset or snapshot
+    string mountpoint;
+
+    this(string line)
+    {
+        import std.algorithm.searching : find;
+        import std.string : representation, stripRight;
+
+        auto found = line.representation.find("  /");
+
+        this.dsName = line[0 .. $ - found.length].stripRight();
+        this.mountpoint = cast(string)found[2 .. $];
+    }
+}
+
+// This differs from the mountpoint property, since it's possible to use
+// mount -t zfs to mount datasets and snapshots somewhere other than where
+// their mountpoint property indicates.
+Mountpoint[] getMounted()
+{
+    import std.algorithm.iteration : map;
+    import std.array : array;
+    import std.format : format;
+    import std.string : lineSplitter;
+
+    return runCmd("zfs mount").lineSplitter().map!Mountpoint().array();
 }
