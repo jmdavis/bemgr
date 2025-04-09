@@ -99,6 +99,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     }
 
     immutable datasetName = buildPath(poolInfo.beParent, toDestroy);
+    enforceDSExists(datasetName);
     enforce(poolInfo.rootFS != datasetName, format!"Error: %s is the active boot environment"(toDestroy));
 
     auto di = getDestroyInfo(poolInfo, toDestroy);
