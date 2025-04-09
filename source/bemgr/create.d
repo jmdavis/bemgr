@@ -98,8 +98,9 @@ The characters allowed in boot environment names are:` ~ allowed;
         origin = createSnapshotWithTime(poolInfo.rootFS);
     else if(origin.indexOf('@') == -1)
     {
+        origin = buildPath(poolInfo.beParent, origin);
         enforceDSExists(origin);
-        origin = createSnapshotWithTime(buildPath(poolInfo.beParent, origin));
+        origin = createSnapshotWithTime(origin);
     }
     else
     {
