@@ -37,7 +37,7 @@ bemgr create <beName@snapshot>
     import std.stdio : writeln;
     import std.string : indexOf;
 
-    import bemgr.util : enforceDSExists, getCurrTimeWithOffset, getPoolInfo, runCmd;
+    import bemgr.util : createSnapshotWithTime, enforceDSExists, getPoolInfo, runCmd;
 
     string origin;
     bool help;
@@ -95,15 +95,11 @@ The characters allowed in boot environment names are:` ~ allowed;
     immutable clone = buildPath(poolInfo.beParent, newBE);
 
     if(origin.empty)
-    {
-        origin = format!"%s@bemgr_%s"(poolInfo.rootFS, getCurrTimeWithOffset());
-        runCmd(format!"zfs snap %s"(esfn(origin)));
-    }
+        origin = createSnapshotWithTime(poolInfo.rootFS);
     else if(origin.indexOf('@') == -1)
     {
         enforceDSExists(origin);
-        origin = format!"%s/%s@bemgr_%s"(poolInfo.beParent, origin, getCurrTimeWithOffset());
-        runCmd(format!"zfs snap %s"(esfn(origin)));
+        origin = createSnapshotWithTime(buildPath(poolInfo.beParent, origin));
     }
     else
     {
