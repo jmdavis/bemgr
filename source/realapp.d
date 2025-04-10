@@ -54,7 +54,8 @@ Use --help on individual commands for more information.`;
             case "list": return doList(args);
             case "mount": return doMount(args);
             case "rename": return doRename(args);
-            case "umount": return doUmount(args);
+            case "umount":
+            case "unmount": return doUmount(args);
             case "--help": writeln(helpMsg); return 0;
             default: throw new Exception(helpMsg);
         }
