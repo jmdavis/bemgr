@@ -42,22 +42,23 @@ version(unittest) shared static this()
     startList = cast(immutable)getCurrDSList();
 
     enforce(!startList.find!(a => a.name == "zroot/ROOT")().empty,
-            "zroot/ROOT does not exist. Read integration_tests/README.md!");
+            "zroot/ROOT does not exist. Read integration_tests/README.md.");
 
     enforce(!startList.find!(a => a.name == "zroot/ROOT/default")().empty,
-            "zroot/ROOT/default does not exist. Read integration_tests/README.md!");
+            "zroot/ROOT/default does not exist. Read integration_tests/README.md.");
 
     auto found = getMounted().find!(a => a.mountpoint == "/")();
     enforce(!found.empty && found.front.dsName == "zroot/ROOT/default",
-            "/ is not mounted on zroot/ROOT/default");
+            "/ is not mounted on zroot/ROOT/default. Read integration_tests/README.md.");
 
-    enforce(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+    enforce(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default",
+            "bootfs is not set to zroot/ROOT/default. Read integration_tests/README.md.");
 
     enforce(startList.find!(a => a.name.startsWith("zroot/ROOT/default/")).empty,
-            "zroot/ROOT/default has child datasets. Read integration_tests/README.md!");
+            "zroot/ROOT/default has child datasets. Read integration_tests/README.md.");
 
     enforce(startList.find!(a => a.name.startsWith("zroot/ROOT/default@")).empty,
-            "zroot/ROOT/default has snapshots. Read integration_tests/README.md!");
+            "zroot/ROOT/default has snapshots. Read integration_tests/README.md.");
 }
 
 // basic functionality of bemgr list
@@ -519,4 +520,213 @@ unittest
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);
+}
+
+// basic functionality of bemgr activate
+unittest
+{
+    import core.exception : AssertError;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.path : buildPath;
+
+    static void test(string activated, size_t line = __LINE__)
+    {
+        foreach(e; zfsList!("name", "origin", "canmount", "mountpoint")("zroot/ROOT", "filesystem"))
+        {
+            if(e.name == "zroot/ROOT")
+                continue;
+
+            if(e.name == buildPath("zroot/ROOT", activated))
+                enforce!AssertError(e.origin == "-", format!"%s is a clone"(e.name), __FILE__, line);
+            else
+                enforce!AssertError(e.origin != "-", format!"%s is not a clone"(e.name), __FILE__, line);
+
+            enforce!AssertError(e.canmount == "noauto", format!"%s has wrong canmount"(e.name), __FILE__, line);
+            enforce!AssertError(e.mountpoint == "/", format!"%s has wrong mountpoint"(e.name), __FILE__, line);
+        }
+
+        immutable bootFS = zpoolGet("bootfs", "zroot");
+        enforce!AssertError(bootFS == format!"zroot/ROOT/%s"(activated),
+                            format!"wrong activated: %s"(bootFS), __FILE__, line);
+    }
+
+    {
+        bemgr("create", "foo");
+        bemgr("create", "bar");
+        bemgr("create", "baz");
+        test("default");
+
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        bemgr("create", "bar");
+        bemgr("create", "baz");
+        test("default");
+
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        test("default");
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("create", "bar");
+        test("default");
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("create", "baz");
+        test("default");
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        test("default");
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("create", "bar");
+        test("foo");
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("create", "baz");
+        test("bar");
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        test("default");
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("create", "-e foo bar");
+        test("default");
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("create", "baz -e bar");
+        test("default");
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        test("default");
+        bemgr("activate", "foo");
+        test("foo");
+
+        bemgr("create", "-e foo bar");
+        test("foo");
+        bemgr("activate", "bar");
+        test("bar");
+
+        bemgr("create", "baz -e bar");
+        test("bar");
+        bemgr("activate", "baz");
+        test("baz");
+
+        bemgr("activate", "default");
+        test("default");
+
+        bemgr("destroy", "foo");
+        bemgr("destroy", "bar");
+        bemgr("destroy", "baz");
+
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
 }

@@ -57,6 +57,21 @@ auto zfsList(props...)(string dsName, bool recursive = true)
     return result.lineSplitter().map!(ListLine!props.parse)();
 }
 
+auto zfsList(props...)(string dsName, string type, bool recursive = true)
+    if(allSatisfy!(isStringVal, props))
+{
+    import std.algorithm.iteration : map;
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+    import std.range : only;
+    import std.string : lineSplitter;
+
+
+    auto result = runCmd(format!"zfs list -t %s -Hpo %-(%s,%)%s %s"(type, only(props), recursive ? " -r" : "", esfn(dsName)));
+
+    return result.lineSplitter().map!(ListLine!props.parse)();
+}
+
 string zpoolGet(string prop, string pool)
 {
     import std.format : format;
