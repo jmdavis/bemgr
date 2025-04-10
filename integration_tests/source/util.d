@@ -220,32 +220,25 @@ unittest
     test([LL("a"), LL("b"), LL("c")], [LL("c"), LL("d")], [LL("a"), LL("b")], [LL("d")]);
 }
 
-struct Mountpoint
-{
-    string dsName; // dataset or snapshot
-    string mountpoint;
-
-    this(string line)
-    {
-        import std.algorithm.searching : find;
-        import std.string : representation, stripRight;
-
-        auto found = line.representation.find("  /");
-
-        this.dsName = line[0 .. $ - found.length].stripRight();
-        this.mountpoint = cast(string)found[2 .. $];
-    }
-}
-
 // This differs from the mountpoint property, since it's possible to use
 // mount -t zfs to mount datasets and snapshots somewhere other than where
 // their mountpoint property indicates.
-Mountpoint[] getMounted()
+string[string] getMounted()
 {
-    import std.algorithm.iteration : map;
-    import std.array : array;
-    import std.format : format;
-    import std.string : lineSplitter;
+    import std.algorithm.searching : find;
+    import std.string : lineSplitter, representation, stripRight;
 
-    return runCmd("zfs mount").lineSplitter().map!Mountpoint().array();
+    string[string] retval;
+
+    foreach(line; runCmd("zfs mount").lineSplitter())
+    {
+        auto found = line.representation.find("  /");
+
+        auto dsName = line[0 .. $ - found.length].stripRight();
+        auto mountpoint = cast(string)found[2 .. $];
+
+        retval[dsName] = mountpoint;
+    }
+
+    return retval;
 }

@@ -47,8 +47,9 @@ version(unittest) shared static this()
     enforce(!startList.find!(a => a.name == "zroot/ROOT/default")().empty,
             "zroot/ROOT/default does not exist. Read integration_tests/README.md.");
 
-    auto found = getMounted().find!(a => a.mountpoint == "/")();
-    enforce(!found.empty && found.front.dsName == "zroot/ROOT/default",
+    auto mounted = getMounted();
+    auto defaultMount = "zroot/ROOT/default" in mounted;
+    enforce(defaultMount !is null && *defaultMount == "/",
             "/ is not mounted on zroot/ROOT/default. Read integration_tests/README.md.");
 
     enforce(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default",
@@ -544,6 +545,16 @@ unittest
 
             enforce!AssertError(e.canmount == "noauto", format!"%s has wrong canmount"(e.name), __FILE__, line);
             enforce!AssertError(e.mountpoint == "/", format!"%s has wrong mountpoint"(e.name), __FILE__, line);
+
+            auto mounted = getMounted();
+            if(e.name == "zroot/ROOT/default")
+            {
+                auto mountpoint = "zroot/ROOT/default" in mounted;
+                enforce!AssertError(mountpoint !is null && *mountpoint == "/",
+                                    "zroot/ROOT/default is not mounted on /", __FILE__, line);
+            }
+            else
+                enforce!AssertError(e.name !in mounted, format!"%s is mounted"(e), __FILE__, line);
         }
 
         immutable bootFS = zpoolGet("bootfs", "zroot");
@@ -729,4 +740,124 @@ unittest
         assert(diff.missing.empty);
         assert(diff.extra.empty);
     }
+}
+
+// basic functionality of bemgr rename
+unittest
+{
+    import core.exception : AssertError;
+    import std.algorithm.iteration : map;
+    import std.algorithm.sorting : sort;
+    import std.array : array;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.range : chain, only;
+
+    static void test(string defaultName, string active, string[] others, size_t line = __LINE__)
+    {
+        auto mounted = getMounted();
+
+        foreach(e; chain(only(defaultName), others).map!(a => buildPath("zroot/ROOT", a))())
+        {
+            if(e["zroot/ROOT/".length .. $] == defaultName)
+            {
+                auto mountpoint = e in mounted;
+                enforce!AssertError(mountpoint !is null && *mountpoint == "/",
+                                    format!"%s is not mounted on /"(e), __FILE__, line);
+            }
+            else
+                enforce!AssertError(e !in mounted, format!"%s is mounted"(e), __FILE__, line);
+
+            enforce!AssertError(zfsGet("canmount", e) == "noauto",
+                                format!"%s has wrong canmount"(e), __FILE__, line);
+            enforce!AssertError(zfsGet("mountpoint", e) == "/",
+                                format!"%s has wrong mountpoint"(e), __FILE__, line);
+        }
+
+        enforce!AssertError(zpoolGet("bootfs", "zroot") == buildPath("zroot/ROOT", active),
+                            "The bootfs property is wrong", __FILE__, line);
+    }
+
+    test("default", "default", []);
+
+    {
+        bemgr("rename", "default unfault");
+
+        auto list = zfsList!"name"("zroot/ROOT").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 2);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/unfault");
+
+        test("unfault", "unfault", []);
+    }
+    {
+        bemgr("rename", "unfault default");
+
+        auto list = zfsList!"name"("zroot/ROOT").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 2);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/default");
+
+        test("default", "default", []);
+    }
+    {
+        bemgr("create", "foo");
+
+        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 3);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/default");
+        assert(list[2].name == "zroot/ROOT/foo");
+
+        test("default", "default", ["foo"]);
+    }
+    {
+        bemgr("rename", "foo bar");
+
+        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 3);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/bar");
+        assert(list[2].name == "zroot/ROOT/default");
+
+        test("default", "default", ["bar"]);
+    }
+    {
+        bemgr("activate", "bar");
+
+        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 3);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/bar");
+        assert(list[2].name == "zroot/ROOT/default");
+
+        test("default", "bar", ["bar"]);
+    }
+    {
+        bemgr("rename", "bar foo");
+
+        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
+        list.sort!((a, b) => a.name < b.name)();
+        assert(list.length == 3);
+        assert(list[0].name == "zroot/ROOT");
+        assert(list[1].name == "zroot/ROOT/default");
+        assert(list[2].name == "zroot/ROOT/foo");
+
+        test("default", "foo", ["foo"]);
+    }
+
+    bemgr("activate", "default");
+    bemgr("destroy", "foo");
+
+    test("default", "default", []);
+
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }
