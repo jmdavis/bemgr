@@ -69,6 +69,10 @@ version(unittest) shared static this()
 //    happen in practice) to make sure that bemgr behaves sanely in unusual
 //    and/or bad situations
 
+// -----------------------------------------------------------------------------
+// Tests for basic functionality
+// -----------------------------------------------------------------------------
+
 // basic functionality of bemgr list
 unittest
 {
@@ -943,6 +947,10 @@ unittest
     assert(diff.extra.empty);
 }
 
+// -----------------------------------------------------------------------------
+// Tests for bad input
+// -----------------------------------------------------------------------------
+
 // Test various bad inputs for bemgr activate
 unittest
 {
@@ -1083,3 +1091,73 @@ unittest
     bemgr("destroy", "-F " ~ origin);
     check("default", startList);
 }
+
+// Test various bad inputs for bemgr export and bemgr import
+unittest
+{
+    import core.exception : AssertError;
+    import std.exception : assertThrown, enforce;
+    import std.file : exists, remove, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+
+    static void check(size_t line = __LINE__)
+    {
+        checkActivated("default", __FILE__, line);
+        auto diff = diffNameList(startList, getCurrDSList());
+        enforce!AssertError(diff.missing.empty, "missing isn't empty", __FILE__, line);
+        enforce!AssertError(diff.extra.empty, "extra isn't empty", __FILE__, line);
+    }
+
+    immutable exportFile = buildPath(tempDir, "bemgr_foo");
+
+    scope(exit)
+    {
+        if(exportFile.exists)
+            remove(exportFile);
+    }
+
+    assertThrown(bemgr("export", "foo"));
+    check();
+
+    bemgr("export", format!"-v default > %s"(exportFile));
+    check();
+
+    assertThrown(runCmd(format!"cat %s | ../bemgr import"(exportFile)));
+    check();
+
+    assertThrown(runCmd(format!"cat %s | ../bemgr -v import"(exportFile)));
+    check();
+
+    assertThrown(runCmd(format!"cat %s | ../bemgr import default"(exportFile)));
+    check();
+
+    assertThrown(runCmd(format!"cat %s | ../bemgr import -v default"(exportFile)));
+    check();
+
+    runCmd(format!"cat %s | ../bemgr import -v foo"(exportFile));
+    assert(dsExists("zroot/ROOT/foo"));
+    checkActivated("default", ["foo"]);
+
+    bemgr("destroy", "foo");
+    check();
+}
+
+// Test various bad inputs for bemgr list
+unittest
+{
+}
+
+// Test various bad inputs for bemgr mount and bemgr umount
+unittest
+{
+}
+
+// Test various bad inputs for bemgr rename
+unittest
+{
+}
+
+// -----------------------------------------------------------------------------
+// Tests for corner cases
+// -----------------------------------------------------------------------------
