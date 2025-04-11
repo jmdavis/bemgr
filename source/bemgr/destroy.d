@@ -64,7 +64,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     bool help;
 
     getopt(args, config.bundling,
-           "keep", &keep,
+           "k", &keep,
            "n", &dryRun,
            "f", &force,
            "help", &help);
