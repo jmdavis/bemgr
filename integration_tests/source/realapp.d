@@ -895,7 +895,7 @@ unittest
             {
                 auto mountpoint = "zroot/ROOT/foo" in mounted;
                 assert(mountpoint !is null && *mountpoint == mnt);
-                assert(buildPath(*mountpoint, "bin").exists);
+                assert(buildPath(mnt, "bin").exists);
             }
             {
                 auto mountpoint = "zroot/ROOT/default" in mounted;
@@ -932,6 +932,85 @@ unittest
 
     bemgr("destroy", "foo");
     bemgr("destroy", "bar");
+
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// basic functionality of bemgr export and bemgr import
+unittest
+{
+    import std.algorithm.searching : startsWith;
+    import std.file : exists, mkdirRecurse, remove, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable exportFile = buildPath(tempDir, "bemgr_foo");
+    immutable mnt = buildPath(tempDir, "bemgr_mount");
+
+    mkdirRecurse(mnt);
+
+    scope(exit)
+    {
+        if(exportFile.exists)
+            remove(exportFile);
+        rmdir(mnt);
+    }
+
+    {
+        bemgr("export", "default > /dev/null");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("export", "-k default > /dev/null");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 1);
+        assert(diff.extra[0].name.startsWith("zroot/ROOT/default@"));
+        bemgr("destroy", diff.extra[0].name["zroot/ROOT/".length .. $]);
+    }
+    {
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("export", format!"default > %s"(exportFile));
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        runCmd(format!"cat %s | ../bemgr import foo"(exportFile));
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 2);
+        assert(diff.extra[0].name == "zroot/ROOT/foo");
+        assert(diff.extra[1].name.startsWith("zroot/ROOT/foo@"));
+    }
+
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+    assert("zroot/ROOT/foo" !in getMounted());
+
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    assert(buildPath(mnt, "bin").exists);
+    bemgr("umount", "foo");
+
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
+    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+
+    bemgr("destroy", "foo");
 
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
