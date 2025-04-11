@@ -902,3 +902,55 @@ unittest
     assert(diff.missing.empty);
     assert(diff.extra.empty);
 }
+
+// Test various bad inputs for bemgr activate
+unittest
+{
+    import std.exception : assertThrown;
+    import std.format : format;
+    import std.path : buildPath;
+
+    bemgr("activate", "default");
+    checkActivated("default");
+
+    assertThrown(bemgr("activate", "default default"));
+    checkActivated("default");
+
+    assertThrown(bemgr("activate", "foo"));
+    checkActivated("default");
+
+    assertThrown(bemgr("activate", ""));
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test various bad inputs for bemgr create
+unittest
+{
+    import core.exception : AssertError;
+    import std.exception : assertThrown, enforce;
+
+    static void check(size_t line = __LINE__)
+    {
+        checkActivated("default", __FILE__, line);
+        auto diff = diffNameList(startList, getCurrDSList());
+        enforce!AssertError(diff.missing.empty, "missing isn't empty", __FILE__, line);
+        enforce!AssertError(diff.extra.empty, "extra isn't empty", __FILE__, line);
+    }
+
+    assertThrown(bemgr("create", "default"));
+    check();
+    assertThrown(bemgr("create", ""));
+    check();
+    assertThrown(bemgr("create", "-e default"));
+    check();
+    assertThrown(bemgr("create", "-e foo bar"));
+    check();
+    assertThrown(bemgr("create", "-e default@foo bar"));
+    check();
+    assertThrown(bemgr("create", "foo@bar"));
+    check();
+}

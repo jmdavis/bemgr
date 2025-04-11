@@ -243,6 +243,11 @@ string[string] getMounted()
     return retval;
 }
 
+void checkActivated(string activated, string file, size_t line)
+{
+    checkActivated(activated, null, "default", true, file, line);
+}
+
 void checkActivated(string activated, bool checkMounted, string file = __FILE__, size_t line = __LINE__)
 {
     checkActivated(activated, null, "default", checkMounted, file, line);
