@@ -82,6 +82,8 @@ bemgr destroy [-n] [-F] <beName@snapshot>
 
     if(toDestroy.indexOf('@') != -1)
     {
+        enforce(!keep, "-k is not a valid flag when destroying a snapshot");
+
         immutable snapName = buildPath(poolInfo.beParent, toDestroy);
         enforceDSExists(snapName);
 
