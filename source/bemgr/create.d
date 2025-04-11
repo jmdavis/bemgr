@@ -33,7 +33,7 @@ bemgr create <beName@snapshot>
     import std.format : format;
     import std.getopt : config, getopt;
     import std.path : buildPath;
-    import std.process : esfn = escapeShellFileName;
+    import std.process : esfn = escapeShellFileName, executeShell;
     import std.stdio : writeln;
     import std.string : indexOf;
 
@@ -94,6 +94,7 @@ The characters allowed in boot environment names are:` ~ allowed;
     }
 
     immutable clone = buildPath(poolInfo.beParent, newBE);
+    enforce(executeShell(format!"zfs list %s"(esfn(clone))).status != 0, format!"Error: %s already exists"(newBE));
 
     if(origin.empty)
         origin = createSnapshotWithTime(poolInfo.rootFS);
