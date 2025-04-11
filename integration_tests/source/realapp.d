@@ -405,11 +405,33 @@ unittest
     import std.algorithm.searching : startsWith;
     import std.algorithm.sorting : sort;
     import std.array : array;
+    import std.format : format;
 
     {
         bemgr("create", "foo");
         bemgr("destroy", "foo");
 
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty );
+    }
+    {
+        bemgr("create", "foo");
+        immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+        bemgr("destroy", "-k foo");
+
+        {
+            checkActivated("default");
+            auto diff = diffNameList(startList, getCurrDSList());
+            assert(diff.missing.empty);
+            assert(diff.extra.length == 1);
+            assert(diff.extra[0].name == origin);
+        }
+
+        runCmd(format!"zfs destroy %s"(origin));
+
+        checkActivated("default");
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
         assert(diff.extra.empty );
@@ -427,6 +449,7 @@ unittest
 
         bemgr("destroy", "foo");
 
+        checkActivated("default");
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
         assert(diff.extra.empty );
@@ -988,57 +1011,75 @@ unittest
         enforce!AssertError(diff.extra.empty, "extra isn't empty", __FILE__, line);
     }
 
-    assertThrown(bemgr("destroy", ""));
-    check("default", getCurrDSList());
+    static void test(string args, string activated, const typeof(getCurrDSList()) list, size_t line = __LINE__)
+    {
+        assertThrown(bemgr("destroy", args), "failed with no flags", __FILE__, line);
+        check(activated, list, line);
 
-    assertThrown(bemgr("destroy", "default"));
-    check("default", getCurrDSList());
+        assertThrown(bemgr("destroy", "-n " ~ args), "failed with -n", __FILE__, line);
+        check(activated, list, line);
 
-    assertThrown(bemgr("destroy", "zroot/ROOT/default"));
-    check("default", getCurrDSList());
+        assertThrown(bemgr("destroy", "-F " ~ args), "failed with -F", __FILE__, line);
+        check(activated, list, line);
+
+        assertThrown(bemgr("destroy", "-n -F " ~ args), "failed with -n -F", __FILE__, line);
+        check(activated, list, line);
+    }
+
+    test("", "default", startList);
+    test("default", "default", startList);
+    test("zroot/ROOT/default", "default", startList);
+
+    {
+        bemgr("create", "foo");
+        bemgr("activate", "foo");
+        auto withFoo = getCurrDSList();
+
+        test("default", "foo", withFoo);
+        test("foo", "foo", withFoo);
+        test("zroot/ROOT/foo", "foo", withFoo);
+        test("default@foo", "foo", withFoo);
+        test("zroot/ROOT/default@foo", "foo", withFoo);
+
+        immutable count = withFoo.countUntil!(a => a.name.startsWith("zroot/ROOT/foo@"))();
+        auto origin = withFoo[count].name;
+        test(origin["zroot/ROOT/".length .. $], "foo", withFoo);
+
+        bemgr("activate", "default");
+        origin = "zroot/ROOT/default@" ~ origin["zroot/ROOT/foo@".length .. $];
+        withFoo[count].name = origin;
+        withFoo.sort!((a, b) => a.name < b.name)();
+        check("default", withFoo);
+
+        test(origin["zroot/ROOT/".length .. $], "default", withFoo);
+        test(origin, "default", withFoo);
+        test("zroot/ROOT/foo", "default", withFoo);
+
+        bemgr("destroy", "-n foo");
+        check("default", withFoo);
+
+        bemgr("destroy", "-n -k foo");
+        check("default", withFoo);
+
+        bemgr("destroy", "-n -F foo");
+        check("default", withFoo);
+
+        bemgr("destroy", "-n -k -F foo");
+        check("default", withFoo);
+
+        bemgr("destroy", "foo");
+        check("default", startList);
+    }
 
     bemgr("create", "foo");
-    bemgr("activate", "foo");
-    auto withFoo = getCurrDSList();
+    auto origin = zfsGet("origin", "zroot/ROOT/foo");
+    bemgr("destroy", "-k -F foo");
+    assert(dsExists(origin));
+    origin = origin["zroot/ROOT/".length .. $];
+    auto withOrigin = getCurrDSList();
 
-    assertThrown(bemgr("destroy", "default"));
-    check("foo", withFoo);
+    test("-k " ~ origin, "default", withOrigin);
 
-    assertThrown(bemgr("destroy", "foo"));
-    check("foo", withFoo);
-
-    assertThrown(bemgr("destroy", "zroot/ROOT/foo"));
-    check("foo", withFoo);
-
-    assertThrown(bemgr("destroy", "default@foo"));
-    check("foo", withFoo);
-
-    assertThrown(bemgr("destroy", "zroot/ROOT/default@foo"));
-    check("foo", withFoo);
-
-    immutable count = withFoo.countUntil!(a => a.name.startsWith("zroot/ROOT/foo@"))();
-    auto origin = withFoo[count].name;
-    assertThrown(bemgr("destroy", origin["zroot/ROOT/".length .. $]));
-    check("foo", withFoo);
-
-    bemgr("activate", "default");
-    origin = "zroot/ROOT/default@" ~ origin["zroot/ROOT/foo@".length .. $];
-    withFoo[count].name = origin;
-    withFoo.sort!((a, b) => a.name < b.name)();
-    check("default", withFoo);
-
-    assertThrown(bemgr("destroy", origin["zroot/ROOT/".length .. $]));
-    check("default", withFoo);
-
-    assertThrown(bemgr("destroy", origin));
-    check("default", withFoo);
-
-    assertThrown(bemgr("destroy", "zroot/ROOT/foo"));
-    check("default", withFoo);
-
-    bemgr("destroy", "-n -F foo");
-    check("default", withFoo);
-
-    bemgr("destroy", "foo");
+    bemgr("destroy", "-F " ~ origin);
     check("default", startList);
 }

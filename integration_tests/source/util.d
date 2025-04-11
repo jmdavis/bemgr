@@ -243,6 +243,14 @@ string[string] getMounted()
     return retval;
 }
 
+bool dsExists(string dsName)
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName, executeShell;
+
+    return executeShell(format!"zfs list %s"(esfn(dsName))).status == 0;
+}
+
 void checkActivated(string activated, string file, size_t line)
 {
     checkActivated(activated, null, "default", true, file, line);
