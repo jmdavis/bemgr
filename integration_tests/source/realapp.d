@@ -179,11 +179,7 @@ unittest
         assert(result[3].origin == result[2].name);
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+    checkActivated("default");
 
     bemgr("create", "bar");
     {
@@ -202,30 +198,27 @@ unittest
         assert(result[5].origin == result[3].name);
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+    checkActivated("default");
 
+    {
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 4);
+        assert(diff.extra[0].name == "zroot/ROOT/bar");
+        assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
+        assert(diff.extra[2].name.startsWith("zroot/ROOT/default@"));
+        assert(diff.extra[3].name == "zroot/ROOT/foo");
+
+        runCmd("zfs destroy zroot/ROOT/bar");
+        runCmd("zfs destroy zroot/ROOT/foo");
+        runCmd(format!"zfs destroy %s"(diff.extra[1].name));
+        runCmd(format!"zfs destroy %s"(diff.extra[2].name));
+    }
+
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
-    assert(diff.extra.length == 4);
-    assert(diff.extra[0].name == "zroot/ROOT/bar");
-    assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
-    assert(diff.extra[2].name.startsWith("zroot/ROOT/default@"));
-    assert(diff.extra[3].name == "zroot/ROOT/foo");
-
-    runCmd("zfs destroy zroot/ROOT/bar");
-    runCmd("zfs destroy zroot/ROOT/foo");
-    runCmd(format!"zfs destroy %s"(diff.extra[1].name));
-    runCmd(format!"zfs destroy %s"(diff.extra[2].name));
-
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    assert(diff.extra.empty);
 }
 
 // basic functionality of bemgr create -e beName
@@ -249,11 +242,7 @@ unittest
         assert(result[3].origin == result[2].name);
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+    checkActivated("default");
 
     bemgr("create", "-e foo bar");
     {
@@ -272,29 +261,26 @@ unittest
         assert(result[5].clones == "zroot/ROOT/bar");
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+    checkActivated("default");
 
+    {
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 4);
+        assert(diff.extra[0].name == "zroot/ROOT/bar");
+        assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
+        assert(diff.extra[2].name == "zroot/ROOT/foo");
+        assert(diff.extra[3].name.startsWith("zroot/ROOT/foo@"));
+
+        runCmd("zfs destroy zroot/ROOT/bar");
+        runCmd("zfs destroy -r zroot/ROOT/foo");
+        runCmd(format!"zfs destroy %s"(diff.extra[1].name));
+    }
+
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
-    assert(diff.extra.length == 4);
-    assert(diff.extra[0].name == "zroot/ROOT/bar");
-    assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
-    assert(diff.extra[2].name == "zroot/ROOT/foo");
-    assert(diff.extra[3].name.startsWith("zroot/ROOT/foo@"));
-
-    runCmd("zfs destroy zroot/ROOT/bar");
-    runCmd("zfs destroy -r zroot/ROOT/foo");
-    runCmd(format!"zfs destroy %s"(diff.extra[1].name));
-
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    assert(diff.extra.empty);
 }
 
 // basic functionality of bemgr create -e beName@snapshot
@@ -322,11 +308,7 @@ unittest
         fooSnap = result[2].name["zroot/ROOT/".length .. $];
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+    checkActivated("default");
 
     bemgr("create", format!"-e %s bar"(fooSnap));
     {
@@ -344,28 +326,25 @@ unittest
         assert(result[4].origin == result[3].name);
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+    checkActivated("default");
 
+    {
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 3);
+        assert(diff.extra[0].name == "zroot/ROOT/bar");
+        assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
+        assert(diff.extra[2].name == "zroot/ROOT/foo");
+
+        runCmd("zfs destroy zroot/ROOT/bar");
+        runCmd("zfs destroy zroot/ROOT/foo");
+        runCmd(format!"zfs destroy %s"(diff.extra[1].name));
+    }
+
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
-    assert(diff.extra.length == 3);
-    assert(diff.extra[0].name == "zroot/ROOT/bar");
-    assert(diff.extra[1].name.startsWith("zroot/ROOT/default@"));
-    assert(diff.extra[2].name == "zroot/ROOT/foo");
-
-    runCmd("zfs destroy zroot/ROOT/bar");
-    runCmd("zfs destroy zroot/ROOT/foo");
-    runCmd(format!"zfs destroy %s"(diff.extra[1].name));
-
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    assert(diff.extra.empty);
 }
 
 // basic functionality of bemgr create beName@snapshot
@@ -386,9 +365,7 @@ unittest
         assert(result[2].clones == "-");
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    checkActivated("default");
 
     bemgr("create", "default@bar");
     {
@@ -403,22 +380,23 @@ unittest
         assert(result[3].clones == "-");
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    checkActivated("default");
 
-    auto diff = diffNameList(startList, getCurrDSList());
-    assert(diff.missing.empty);
-    assert(diff.extra.length == 2);
-    assert(diff.extra[0].name == "zroot/ROOT/default@bar");
-    assert(diff.extra[1].name == "zroot/ROOT/default@foo");
+    {
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 2);
+        assert(diff.extra[0].name == "zroot/ROOT/default@bar");
+        assert(diff.extra[1].name == "zroot/ROOT/default@foo");
+    }
 
     runCmd("zfs destroy zroot/ROOT/default@bar");
     runCmd("zfs destroy zroot/ROOT/default@foo");
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }
 
 // basic functionality of bemgr destroy beName
@@ -455,11 +433,7 @@ unittest
             assert(result[3].clones == "zroot/ROOT/bar");
         }
 
-        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-        assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+        checkActivated("default");
 
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
@@ -470,10 +444,7 @@ unittest
         bemgr("destroy", "bar");
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);
@@ -509,9 +480,7 @@ unittest
             assert(result[2].clones == "-");
         }
 
-        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
+        checkActivated("default");
 
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
@@ -521,10 +490,7 @@ unittest
         bemgr("destroy", "default@bar");
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);
@@ -538,54 +504,23 @@ unittest
     import std.format : format;
     import std.path : buildPath;
 
-    static void test(string activated, size_t line = __LINE__)
-    {
-        foreach(e; zfsList!("name", "origin", "canmount", "mountpoint")("zroot/ROOT", "filesystem"))
-        {
-            if(e.name == "zroot/ROOT")
-                continue;
-
-            if(e.name == buildPath("zroot/ROOT", activated))
-                enforce!AssertError(e.origin == "-", format!"%s is a clone"(e.name), __FILE__, line);
-            else
-                enforce!AssertError(e.origin != "-", format!"%s is not a clone"(e.name), __FILE__, line);
-
-            enforce!AssertError(e.canmount == "noauto", format!"%s has wrong canmount"(e.name), __FILE__, line);
-            enforce!AssertError(e.mountpoint == "/", format!"%s has wrong mountpoint"(e.name), __FILE__, line);
-
-            auto mounted = getMounted();
-            if(e.name == "zroot/ROOT/default")
-            {
-                auto mountpoint = "zroot/ROOT/default" in mounted;
-                enforce!AssertError(mountpoint !is null && *mountpoint == "/",
-                                    "zroot/ROOT/default is not mounted on /", __FILE__, line);
-            }
-            else
-                enforce!AssertError(e.name !in mounted, format!"%s is mounted"(e), __FILE__, line);
-        }
-
-        immutable bootFS = zpoolGet("bootfs", "zroot");
-        enforce!AssertError(bootFS == format!"zroot/ROOT/%s"(activated),
-                            format!"wrong activated: %s"(bootFS), __FILE__, line);
-    }
-
     {
         bemgr("create", "foo");
         bemgr("create", "bar");
         bemgr("create", "baz");
-        test("default");
+        checkActivated("default");
 
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
@@ -599,25 +534,25 @@ unittest
         bemgr("create", "foo");
         bemgr("create", "bar");
         bemgr("create", "baz");
-        test("default");
+        checkActivated("default");
 
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
@@ -629,28 +564,28 @@ unittest
     }
     {
         bemgr("create", "foo");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("create", "bar");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("create", "baz");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
@@ -662,22 +597,22 @@ unittest
     }
     {
         bemgr("create", "foo");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("create", "bar");
-        test("foo");
+        checkActivated("foo");
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("create", "baz");
-        test("bar");
+        checkActivated("bar");
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
@@ -689,28 +624,28 @@ unittest
     }
     {
         bemgr("create", "foo");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("create", "-e foo bar");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("create", "baz -e bar");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
@@ -722,27 +657,28 @@ unittest
     }
     {
         bemgr("create", "foo");
-        test("default");
+        checkActivated("default");
         bemgr("activate", "foo");
-        test("foo");
+        checkActivated("foo");
 
         bemgr("create", "-e foo bar");
-        test("foo");
+        checkActivated("foo");
         bemgr("activate", "bar");
-        test("bar");
+        checkActivated("bar");
 
         bemgr("create", "baz -e bar");
-        test("bar");
+        checkActivated("bar");
         bemgr("activate", "baz");
-        test("baz");
+        checkActivated("baz");
 
         bemgr("activate", "default");
-        test("default");
+        checkActivated("default");
 
         bemgr("destroy", "foo");
         bemgr("destroy", "bar");
         bemgr("destroy", "baz");
 
+        checkActivated("default");
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
         assert(diff.extra.empty);
@@ -761,32 +697,7 @@ unittest
     import std.path : buildPath;
     import std.range : chain, only;
 
-    static void test(string defaultName, string active, string[] others, size_t line = __LINE__)
-    {
-        auto mounted = getMounted();
-
-        foreach(e; chain(only(defaultName), others).map!(a => buildPath("zroot/ROOT", a))())
-        {
-            if(e["zroot/ROOT/".length .. $] == defaultName)
-            {
-                auto mountpoint = e in mounted;
-                enforce!AssertError(mountpoint !is null && *mountpoint == "/",
-                                    format!"%s is not mounted on /"(e), __FILE__, line);
-            }
-            else
-                enforce!AssertError(e !in mounted, format!"%s is mounted"(e), __FILE__, line);
-
-            enforce!AssertError(zfsGet("canmount", e) == "noauto",
-                                format!"%s has wrong canmount"(e), __FILE__, line);
-            enforce!AssertError(zfsGet("mountpoint", e) == "/",
-                                format!"%s has wrong mountpoint"(e), __FILE__, line);
-        }
-
-        enforce!AssertError(zpoolGet("bootfs", "zroot") == buildPath("zroot/ROOT", active),
-                            "The bootfs property is wrong", __FILE__, line);
-    }
-
-    test("default", "default", []);
+    checkActivated("default");
 
     {
         bemgr("rename", "default unfault");
@@ -797,7 +708,7 @@ unittest
         assert(list[0].name == "zroot/ROOT");
         assert(list[1].name == "zroot/ROOT/unfault");
 
-        test("unfault", "unfault", []);
+        checkActivated("unfault", "unfault");
     }
     {
         bemgr("rename", "unfault default");
@@ -808,7 +719,7 @@ unittest
         assert(list[0].name == "zroot/ROOT");
         assert(list[1].name == "zroot/ROOT/default");
 
-        test("default", "default", []);
+        checkActivated("default");
     }
     {
         bemgr("create", "foo");
@@ -820,7 +731,7 @@ unittest
         assert(list[1].name == "zroot/ROOT/default");
         assert(list[2].name == "zroot/ROOT/foo");
 
-        test("default", "default", ["foo"]);
+        checkActivated("default");
     }
     {
         bemgr("rename", "foo bar");
@@ -832,7 +743,7 @@ unittest
         assert(list[1].name == "zroot/ROOT/bar");
         assert(list[2].name == "zroot/ROOT/default");
 
-        test("default", "default", ["bar"]);
+        checkActivated("default");
     }
     {
         bemgr("activate", "bar");
@@ -844,7 +755,7 @@ unittest
         assert(list[1].name == "zroot/ROOT/bar");
         assert(list[2].name == "zroot/ROOT/default");
 
-        test("default", "bar", ["bar"]);
+        checkActivated("bar");
     }
     {
         bemgr("rename", "bar foo");
@@ -856,14 +767,15 @@ unittest
         assert(list[1].name == "zroot/ROOT/default");
         assert(list[2].name == "zroot/ROOT/foo");
 
-        test("default", "foo", ["foo"]);
+        checkActivated("foo");
     }
 
     bemgr("activate", "default");
+    checkActivated("default");
+
     bemgr("destroy", "foo");
 
-    test("default", "default", []);
-
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);
@@ -904,30 +816,12 @@ unittest
             assert("zroot/ROOT/bar" !in mounted);
         }
 
-        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-        assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-        assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+        checkActivated("default", false);
 
         bemgr(cmd, "foo");
         assert(dirEntries(mnt, SpanMode.shallow).empty);
 
-        auto mounted = getMounted();
-        auto mountpoint = "zroot/ROOT/default" in mounted;
-        assert(mountpoint !is null && *mountpoint == "/");
-        assert("zroot/ROOT/foo" !in mounted);
-        assert("zroot/ROOT/bar" !in mounted);
-
-        assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-        assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-        assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-        assert(zfsGet("canmount", "zroot/ROOT/bar") == "noauto");
-        assert(zfsGet("mountpoint", "zroot/ROOT/bar") == "/");
+        checkActivated("default");
     }
 
     bemgr("destroy", "foo");
@@ -993,25 +887,17 @@ unittest
         assert(diff.extra[1].name.startsWith("zroot/ROOT/foo@"));
     }
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
-    assert("zroot/ROOT/foo" !in getMounted());
+    checkActivated("default", ["foo"]);
 
     bemgr("mount", format!"foo %s"(esfn(mnt)));
     assert(buildPath(mnt, "bin").exists);
     bemgr("umount", "foo");
 
-    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
-    assert(zfsGet("canmount", "zroot/ROOT/default") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/default") == "/");
-    assert(zfsGet("canmount", "zroot/ROOT/foo") == "noauto");
-    assert(zfsGet("mountpoint", "zroot/ROOT/foo") == "/");
+    checkActivated("default", ["foo"]);
 
     bemgr("destroy", "foo");
 
+    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);

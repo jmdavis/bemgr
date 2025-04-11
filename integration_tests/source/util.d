@@ -242,3 +242,58 @@ string[string] getMounted()
 
     return retval;
 }
+
+void checkActivated(string activated, bool checkMounted, string file = __FILE__, size_t line = __LINE__)
+{
+    checkActivated(activated, null, "default", checkMounted, file, line);
+}
+
+void checkActivated(string activated, string defaultName, string file = __FILE__, size_t line = __LINE__)
+{
+    checkActivated(activated, null, defaultName, true, file, line);
+}
+
+void checkActivated(string activated, string[] otherNotClones = null,
+                    string defaultName = "default", bool checkMounted = true,
+                    string file = __FILE__, size_t line = __LINE__)
+{
+    import core.exception : AssertError;
+    import std.algorithm.searching : canFind;
+    import std.exception : enforce;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.range : chain, only;
+
+    immutable fullDN = buildPath("zroot/ROOT", defaultName);
+
+    foreach(e; zfsList!("name", "origin", "canmount", "mountpoint")("zroot/ROOT", "filesystem"))
+    {
+        if(e.name == "zroot/ROOT")
+            continue;
+
+        if(chain(only(activated), otherNotClones).canFind(e.name["zroot/ROOT/".length .. $]))
+            enforce!AssertError(e.origin == "-", format!"%s is a clone"(e.name), file, line);
+        else
+            enforce!AssertError(e.origin != "-", format!"%s is not a clone"(e.name), file, line);
+
+        enforce!AssertError(e.canmount == "noauto", format!"%s has wrong canmount"(e.name), file, line);
+        enforce!AssertError(e.mountpoint == "/", format!"%s has wrong mountpoint"(e.name), file, line);
+
+        if(checkMounted)
+        {
+            auto mounted = getMounted();
+            if(e.name == fullDN)
+            {
+                auto mountpoint = fullDN in mounted;
+                enforce!AssertError(mountpoint !is null && *mountpoint == "/",
+                                    format!"%s is not mounted on /"(fullDN), file, line);
+            }
+            else
+                enforce!AssertError(e.name !in mounted, format!"%s is mounted"(e), file, line);
+        }
+    }
+
+    immutable bootFS = zpoolGet("bootfs", "zroot");
+    enforce!AssertError(bootFS == format!"zroot/ROOT/%s"(activated),
+                        format!"wrong activated: %s"(bootFS), file, line);
+}
