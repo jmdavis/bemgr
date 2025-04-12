@@ -733,7 +733,6 @@ unittest
 unittest
 {
     import core.exception : AssertError;
-    import std.algorithm.iteration : map;
     import std.algorithm.sorting : sort;
     import std.array : array;
     import std.exception : enforce;
@@ -741,85 +740,45 @@ unittest
     import std.path : buildPath;
     import std.range : chain, only;
 
-    checkActivated("default");
-
+    static void check(string activated, string defaultName, string[] names, size_t line = __LINE__)
     {
-        bemgr("rename", "default unfault");
-
-        auto list = zfsList!"name"("zroot/ROOT").array();
-        list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 2);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/unfault");
-
-        checkActivated("unfault", "unfault");
-    }
-    {
-        bemgr("rename", "unfault default");
-
-        auto list = zfsList!"name"("zroot/ROOT").array();
-        list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 2);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/default");
-
-        checkActivated("default");
-    }
-    {
-        bemgr("create", "foo");
-
         auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
         list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 3);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/default");
-        assert(list[2].name == "zroot/ROOT/foo");
+        enforce!AssertError(list.length == names.length + 1, "wrong length", __FILE__, line);
+        enforce!AssertError(list[0].name == "zroot/ROOT", "wrong zroot/ROOT", __FILE__, line);
 
-        checkActivated("default");
+        foreach(i, e; names)
+            enforce!AssertError(list[i + 1].name == buildPath("zroot/ROOT", e), format!"wrong %s"(i + 1), __FILE__, line);
+
+        checkActivated(activated, defaultName, __FILE__, line);
     }
-    {
-        bemgr("rename", "foo bar");
 
-        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
-        list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 3);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/bar");
-        assert(list[2].name == "zroot/ROOT/default");
+    check("default", "default", ["default"]);
 
-        checkActivated("default");
-    }
-    {
-        bemgr("activate", "bar");
+    bemgr("rename", "default unfault");
+    check("unfault", "unfault", ["unfault"]);
 
-        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
-        list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 3);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/bar");
-        assert(list[2].name == "zroot/ROOT/default");
+    bemgr("rename", "unfault default");
+    check("default", "default", ["default"]);
 
-        checkActivated("bar");
-    }
-    {
-        bemgr("rename", "bar foo");
+    bemgr("create", "foo");
+    check("default", "default", ["default", "foo"]);
 
-        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
-        list.sort!((a, b) => a.name < b.name)();
-        assert(list.length == 3);
-        assert(list[0].name == "zroot/ROOT");
-        assert(list[1].name == "zroot/ROOT/default");
-        assert(list[2].name == "zroot/ROOT/foo");
+    bemgr("rename", "foo bar");
+    check("default", "default", ["bar", "default"]);
 
-        checkActivated("foo");
-    }
+    bemgr("activate", "bar");
+    check("bar", "default", ["bar", "default"]);
+
+    bemgr("rename", "bar foo");
+    check("foo", "default", ["default", "foo"]);
 
     bemgr("activate", "default");
-    checkActivated("default");
+    check("default", "default", ["default", "foo"]);
 
     bemgr("destroy", "foo");
+    check("default", "default", ["default"]);
 
-    checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
     assert(diff.missing.empty);
     assert(diff.extra.empty);
@@ -1000,6 +959,29 @@ unittest
     assertThrown(bemgr("create", "-e default@foo bar"));
     check();
     assertThrown(bemgr("create", "foo@bar"));
+    check();
+
+    bemgr("create", "foo_.:-bar");
+    assert(dsExists("zroot/ROOT/foo_.:-bar"));
+    bemgr("create", "foo_.:-bar@sally");
+    assert(dsExists("zroot/ROOT/foo_.:-bar@sally"));
+    bemgr("destroy", "foo_.:-bar");
+    check();
+
+    assertThrown(bemgr("create", "foo/bar"));
+    check();
+    assertThrown(bemgr("create", "foo#bar"));
+    check();
+    assertThrown(bemgr("create", "foo,bar"));
+    check();
+
+    assertThrown(bemgr("create", "default@foo@bar"));
+    check();
+    assertThrown(bemgr("create", "default@foo/bar"));
+    check();
+    assertThrown(bemgr("create", "default@foo#bar"));
+    check();
+    assertThrown(bemgr("create", "default@foo,bar"));
     check();
 }
 
@@ -1255,6 +1237,59 @@ unittest
 // Test various bad inputs for bemgr rename
 unittest
 {
+    import core.exception : AssertError;
+    import std.algorithm.sorting : sort;
+    import std.array : array;
+    import std.exception : assertThrown, enforce;
+    import std.format : format;
+    import std.path : buildPath;
+
+    static void check(string defaultName, string[] names, size_t line = __LINE__)
+    {
+        auto list = zfsList!"name"("zroot/ROOT", "filesystem").array();
+        list.sort!((a, b) => a.name < b.name)();
+        enforce!AssertError(list.length == names.length + 1, "wrong length", __FILE__, line);
+        enforce!AssertError(list[0].name == "zroot/ROOT", "wrong zroot/ROOT", __FILE__, line);
+
+        foreach(i, e; names)
+            enforce!AssertError(list[i + 1].name == buildPath("zroot/ROOT", e), format!"wrong %s"(i + 1), __FILE__, line);
+
+        checkActivated(defaultName, defaultName, __FILE__, line);
+    }
+
+    assertThrown(bemgr("rename", "default foo@bar"));
+    check("default", ["default"]);
+    assertThrown(bemgr("rename", "default foo/bar"));
+    check("default", ["default"]);
+    assertThrown(bemgr("rename", "default foo#bar"));
+    check("default", ["default"]);
+    assertThrown(bemgr("rename", "default foo,bar"));
+    check("default", ["default"]);
+
+    bemgr("rename", "default def_.:-ault");
+    check("def_.:-ault", ["def_.:-ault"]);
+
+    bemgr("rename", "def_.:-ault default");
+    check("default", ["default"]);
+
+    assertThrown(bemgr("rename", "foo bar"));
+    check("default", ["default"]);
+
+    bemgr("create", "foo");
+    check("default", ["default", "foo"]);
+
+    assertThrown(bemgr("rename", "foo default"));
+    check("default", ["default", "foo"]);
+
+    assertThrown(bemgr("rename", "default foo"));
+    check("default", ["default", "foo"]);
+
+    bemgr("destroy", "foo");
+    check("default", ["default"]);
+
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }
 
 // -----------------------------------------------------------------------------
