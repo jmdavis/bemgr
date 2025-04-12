@@ -1146,11 +1146,110 @@ unittest
 // Test various bad inputs for bemgr list
 unittest
 {
+    import std.exception : assertThrown;
+
+    assertThrown(bemgr("list", "default"));
+    assertThrown(bemgr("list", "-a default"));
+    assertThrown(bemgr("list", "-as default"));
+    assertThrown(bemgr("list", "-H default"));
 }
 
 // Test various bad inputs for bemgr mount and bemgr umount
 unittest
 {
+    import core.exception : AssertError;
+    import std.exception : assertThrown, enforce;
+    import std.file : exists, mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    void check(bool isMounted, size_t line = __LINE__)
+    {
+        auto mounted = getMounted();
+
+        auto default_ = "zroot/ROOT/default" in mounted;
+        enforce!AssertError(default_ !is null && *default_ == "/", "default not mounted properly", __FILE__, line);
+
+        auto foo = "zroot/ROOT/foo" in mounted;
+
+        if(isMounted)
+            enforce!AssertError(foo !is null && *foo == mnt, "foo not mounted properly", __FILE__, line);
+        else
+            enforce!AssertError(foo is null, "foo mounted improperly", __FILE__, line);
+    }
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    assertThrown(bemgr("mount", format!"default %s"(esfn(mnt))));
+    check(false);
+    bemgr("create", "foo");
+    check(false);
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    check(true);
+    bemgr("umount", "foo");
+    check(false);
+
+    version(FreeBSD)
+    {
+        bemgr("mount", format!"foo %s"(esfn(mnt)));
+        check(true);
+        bemgr("umount", "-f foo");
+        check(false);
+        bemgr("mount", format!"foo %s"(esfn(mnt)));
+        check(true);
+        bemgr("unmount", "-f foo");
+        check(false);
+    }
+    else version(linux)
+    {
+        bemgr("mount", format!"foo %s"(esfn(mnt)));
+        check(true);
+        assertThrown(bemgr("umount", "-f foo"));
+        check(true);
+        assertThrown(bemgr("unmount", "-f foo"));
+        check(true);
+        bemgr("unmount", "foo");
+        check(false);
+    }
+    else
+        static assert(false, "Unsupported OS");
+
+    assert(!exists("/foobar_sally"));
+    assertThrown(bemgr("mount", "foo /foobar_sally"));
+    check(false);
+
+    assertThrown(bemgr("mount", format!"/foo %s"(esfn(mnt))));
+    check(false);
+    assertThrown(bemgr("mount", "foo"));
+    check(false);
+    assertThrown(bemgr("mount", ""));
+    check(false);
+
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    check(true);
+    assertThrown(bemgr("umount", ""));
+    check(true);
+    assertThrown(bemgr("umount", "default"));
+    check(true);
+    assertThrown(bemgr("umount", "bar"));
+    check(true);
+    assertThrown(bemgr("umount", "/foo"));
+    check(true);
+
+    bemgr("umount", "foo");
+    check(false);
+
+    checkActivated("default");
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }
 
 // Test various bad inputs for bemgr rename
