@@ -1295,3 +1295,140 @@ unittest
 // -----------------------------------------------------------------------------
 // Tests for corner cases
 // -----------------------------------------------------------------------------
+
+// Test activate with a mounted dataset
+unittest
+{
+    import core.exception : AssertError;
+    import std.exception : enforce;
+    import std.file : mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    void checkFooMount(size_t line = __LINE__)
+    {
+        auto mounted = getMounted();
+        auto foo = "zroot/ROOT/foo" in mounted;
+        enforce!AssertError(foo !is null && *foo == mnt, "unittest failure", __FILE__, line);
+    }
+
+    bemgr("create", "foo");
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    checkActivated("default", false);
+    checkFooMount();
+
+    bemgr("activate", "foo");
+    checkActivated("foo", false);
+    checkFooMount();
+
+    bemgr("activate", "default");
+    checkActivated("default", false);
+    checkFooMount();
+
+    bemgr("umount", "foo");
+    checkActivated("default");
+
+    bemgr("activate", "foo");
+    checkActivated("foo");
+
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    checkActivated("foo", false);
+    checkFooMount();
+
+    bemgr("umount", "foo");
+    checkActivated("foo");
+
+    bemgr("activate", "default");
+    checkActivated("default");
+
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test destroy with a mounted dataset
+unittest
+{
+    import std.file : mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    bemgr("create", "foo");
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    assert("zroot/ROOT/foo" in getMounted());
+
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test rename with a mounted dataset
+unittest
+{
+    import std.file : mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    {
+        bemgr("create", "foo");
+        bemgr("mount", format!"foo %s"(esfn(mnt)));
+        assert("zroot/ROOT/foo" in getMounted());
+
+        bemgr("rename", "foo bar");
+        auto bar = "zroot/ROOT/bar" in getMounted();
+        assert(bar !is null && *bar == mnt);
+
+        bemgr("destroy", "bar");
+
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        bemgr("activate", "foo");
+        bemgr("mount", format!"foo %s"(esfn(mnt)));
+        assert("zroot/ROOT/foo" in getMounted());
+        checkActivated("foo", false);
+
+        bemgr("rename", "foo bar");
+        auto bar = "zroot/ROOT/bar" in getMounted();
+        assert(bar !is null && *bar == mnt);
+        checkActivated("bar", false);
+
+        bemgr("activate", "default");
+        checkActivated("default", false);
+
+        bemgr("destroy", "bar");
+
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+}
