@@ -87,12 +87,12 @@ bemgr unmount <beName>
     version(FreeBSD)
     {
         getopt(args, config.bundling,
+               "f", &force,
                "help", &help);
     }
     else version(linux)
     {
         getopt(args, config.bundling,
-               "f", &force,
                "help", &help);
     }
     else
