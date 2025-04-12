@@ -57,14 +57,6 @@ bemgr create <beName@snapshot>
     immutable newBE = args[2];
     auto poolInfo = getPoolInfo();
 
-    enum allowed = `
-    ASCII letters: a-z A-Z
-    ASCII Digits: 0-9
-    Underscore: _
-    Period: .
-    Colon: :
-    Hypthen: -`;
-
     {
         immutable at = newBE.indexOf('@');
 
@@ -73,25 +65,15 @@ bemgr create <beName@snapshot>
             enforce(origin.empty, "Error: -e is illegal when creating a snapshot");
             enforceDSExists(buildPath(poolInfo.beParent, newBE[0 .. at]));
 
-            enum fmt =
-`Error: Cannot create a snapshot with the name "%s".
-The characters allowed in boot environment snapshots names are:` ~ allowed;
-
             immutable snapName = newBE[at + 1 .. $];
-            enforce(validName(snapName), format!fmt(snapName));
+            enforceValidName(snapName, true);
             runCmd(format!"zfs snap %s"(esfn(buildPath(poolInfo.beParent, newBE))));
 
             return 0;
         }
     }
 
-    {
-        enum fmt =
-`Error: Cannot create a boot environment with the name "%s".
-The characters allowed in boot environment names are:` ~ allowed;
-
-        enforce(validName(newBE), format!fmt((newBE)));
-    }
+    enforceValidName(newBE, false);
 
     immutable clone = buildPath(poolInfo.beParent, newBE);
     enforce(executeShell(format!"zfs list %s"(esfn(clone))).status != 0, format!"Error: %s already exists"(newBE));
@@ -113,6 +95,60 @@ The characters allowed in boot environment names are:` ~ allowed;
     runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)));
     runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)));
     runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(clone)));
+
+    return 0;
+}
+
+int doRename(string[] args)
+{
+    enum helpMsg =
+`bemgr rename <origBEName> <newBEName>
+
+  Renames the given boot environment.`;
+
+    import std.exception : enforce;
+    import std.format : format;
+    import std.getopt : getopt;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+    import std.stdio : stderr, writeln;
+
+    import bemgr.util : getPoolInfo, runCmd;
+
+    bool help;
+
+    getopt(args, "help", &help);
+
+    if(help)
+    {
+        writeln(helpMsg);
+        return 0;
+    }
+
+    enforce(args.length == 4, helpMsg);
+
+    immutable origBE = args[2];
+    immutable newBE = args[3];
+
+    auto poolInfo = getPoolInfo();
+    immutable source = buildPath(poolInfo.beParent, origBE);
+    immutable target = buildPath(poolInfo.beParent, newBE);
+    immutable renamingRootFS = poolInfo.rootFS == source;
+
+    enforceValidName(newBE, false);
+    runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
+
+    if(renamingRootFS)
+    {
+        // This should never happen, but it is technically possible if the
+        // current non-root user has permissions to rename BEs but then can't
+        // change the pool's properties. Realistically though, no user other
+        // than root should have permissions like that on the BEs.
+        scope(failure)
+            stderr.writefln!"Warning: The active BE was renamed, but the bootfs property on %s could not be updated to match."(poolInfo.pool);
+
+        runCmd(format!"zpool set bootfs=%s %s"(esfn(target), esfn(poolInfo.pool)));
+    }
 
     return 0;
 }
@@ -170,4 +206,33 @@ unittest
     assert(!validName(";"));
     assert(!validName("<"));
     assert(!validName(">"));
+}
+
+void enforceValidName(string name, bool snapshot)
+{
+    import std.exception : enforce;
+    import std.format : format;
+
+    enum allowed = `
+    ASCII letters: a-z A-Z
+    ASCII Digits: 0-9
+    Underscore: _
+    Period: .
+    Colon: :
+    Hypthen: -`;
+
+    if(snapshot)
+    {
+        enum fmt =
+`Error: Cannot create a snapshot with the name "%s".
+The characters allowed in boot environment snapshots names are:` ~ allowed;
+
+        enforce(validName(name), format!fmt(name));
+    }
+
+    enum fmt =
+`Error: Cannot create a boot environment with the name "%s".
+The characters allowed in boot environment names are:` ~ allowed;
+
+    enforce(validName(name), format!fmt(name));
 }

@@ -34,7 +34,7 @@ Use --help on individual commands for more information.`;
     import std.getopt : GetOptException;
     import std.stdio : stderr, writeln;
 
-    import bemgr.create : doCreate;
+    import bemgr.create : doCreate, doRename;
     import bemgr.destroy : doDestroy;
     import bemgr.export_ : doExport, doImport;
     import bemgr.list : doList;
@@ -124,59 +124,6 @@ int doActivate(string[] args)
     runCmd(format!"zpool set bootfs=%s %s"(esfn(dataset), esfn(poolInfo.pool)));
 
     writefln("Successfully activated: %s", beName);
-
-    return 0;
-}
-
-int doRename(string[] args)
-{
-    enum helpMsg =
-`bemgr rename <origBEName> <newBEName>
-
-  Renames the given boot environment.`;
-
-    import std.exception : enforce;
-    import std.format : format;
-    import std.getopt : getopt;
-    import std.path : buildPath;
-    import std.process : esfn = escapeShellFileName;
-    import std.stdio : stderr, writeln;
-
-    import bemgr.util : getPoolInfo, runCmd;
-
-    bool help;
-
-    getopt(args, "help", &help);
-
-    if(help)
-    {
-        writeln(helpMsg);
-        return 0;
-    }
-
-    enforce(args.length == 4, helpMsg);
-
-    immutable origBE = args[2];
-    immutable newBE = args[3];
-
-    auto poolInfo = getPoolInfo();
-    immutable source = buildPath(poolInfo.beParent, origBE);
-    immutable target = buildPath(poolInfo.beParent, newBE);
-    immutable renamingRootFS = poolInfo.rootFS == source;
-
-    runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
-
-    if(renamingRootFS)
-    {
-        // This should never happen, but it is technically possible if the
-        // current non-root user has permissions to rename BEs but then can't
-        // change the pool's properties. Realistically though, no user other
-        // than root should have permissions like that on the BEs.
-        scope(failure)
-            stderr.writefln!"Warning: The active BE was renamed, but the bootfs property on %s could not be updated to match."(poolInfo.pool);
-
-        runCmd(format!"zpool set bootfs=%s %s"(esfn(target), esfn(poolInfo.pool)));
-    }
 
     return 0;
 }
