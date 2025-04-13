@@ -43,8 +43,9 @@ PoolInfo getPoolInfo()
     import std.algorithm.searching : find, startsWith;
     import std.exception : enforce;
     import std.format : format;
+    import std.path : dirName;
     import std.process : esfn = escapeShellFileName;
-    import std.string : indexOf;
+    import std.string : indexOf, lineSplitter;
 
     auto mounted = getMountedDatasets();
     auto found = mounted.find!(a => a.mountpoint == "/")();
@@ -57,6 +58,14 @@ PoolInfo getPoolInfo()
     immutable pool = rootFS[0 .. slash];
     immutable bootFS = runCmd(format!`zpool get -H -o value bootfs %s`(esfn(pool)),
                               format!"Error: ZFS boot pool '%s' has unset 'bootfs' property"(pool));
+
+    foreach(e; runCmd("zfs list -Ho name -r -t filesystem zroot/ROOT").lineSplitter())
+    {
+        if(e == "zroot/ROOT")
+            continue;
+
+        enforce(e.dirName == "zroot/ROOT", "This system has boot environments with child datasets");
+    }
 
     return PoolInfo(pool, rootFS, bootFS, mounted);
 }
