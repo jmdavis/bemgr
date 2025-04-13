@@ -1697,3 +1697,53 @@ unittest
     assert(diff.missing.empty);
     assert(diff.extra.empty);
 }
+
+// Test bemgr destroy -n to make sure that it's at least roughly correct
+unittest
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+    import std.range : walkLength;
+    import std.string : lineSplitter;
+
+    bemgr("create", "foo");
+
+    // e.g.
+    /+
+Origin Snapshot to be Destroyed:
+  zroot/ROOT/default@bemgr_2025-04-12T17:13:58.032-06:00
+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/foo
+    +/
+    assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 5);
+
+    immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+    bemgr("create", format!"-e %s bar"(esfn(origin["zroot/ROOT/".length .. $])));
+
+    // e.g.
+    /+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/foo
+    +/
+    assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 2);
+
+    bemgr("destroy", "foo");
+    assert(dsExists(origin));
+
+    // e.g.
+    /+
+Origin Snapshot to be Destroyed:
+  zroot/ROOT/default@bemgr_2025-04-12T17:13:58.032-06:00
+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/bar
+     +/
+    assert(bemgr("destroy", "-n bar").lineSplitter().walkLength() == 5);
+    bemgr("destroy", "bar");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
