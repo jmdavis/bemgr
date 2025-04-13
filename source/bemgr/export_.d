@@ -145,7 +145,7 @@ int doImport(string[] args)
     }
 
     {
-        immutable cmd = format!"zfs set -u mountpoint=/ %s"(esfn(dataset));
+        immutable cmd = format!"zfs set mountpoint=/ %s"(esfn(dataset));
         if(verbose)
             stderr.writefln("\n%s", cmd);
         runCmd(cmd);

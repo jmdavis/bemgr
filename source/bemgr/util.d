@@ -13,17 +13,19 @@ import std.range.primitives;
 
 struct PoolInfo
 {
+    Version zfsVersion;
     string pool;
     string rootFS;
     string bootFS;
     string beParent;
     string[string] mountpoints;
 
-    private this(string pool, string rootFS, string bootFS, Mountpoint[] mounted)
+    private this(Version zfsVersion, string pool, string rootFS, string bootFS, Mountpoint[] mounted)
     {
         import std.algorithm.searching : startsWith;
         import std.path : dirName;
 
+        this.zfsVersion = zfsVersion;
         this.pool = pool;
         this.rootFS = rootFS;
         this.bootFS = bootFS;
@@ -38,6 +40,92 @@ struct PoolInfo
     }
 }
 
+struct Version
+{
+    int major;
+    int minor;
+    int patch;
+
+    int opCmp(Version rhs)
+    {
+        if(this.major < rhs.major)
+            return -1;
+        if(this.major > rhs.major)
+            return 1;
+        if(this.minor < rhs.minor)
+            return -1;
+        if(this.minor > rhs.minor)
+            return 1;
+        if(this.patch < rhs.patch)
+            return -1;
+        if(this.patch > rhs.patch)
+            return 1;
+        return 0;
+    }
+
+    this(int major, int minor, int patch)
+    {
+        this.major = major;
+        this.minor = minor;
+        this.patch = patch;
+    }
+
+    this(string versionStr)
+    {
+        import std.algorithm.iteration : splitter;
+        import std.conv : ConvException, to;
+        import std.exception : enforce;
+        import std.format : format;
+
+        enum errorMsg = `The format of "zfs --version" is not what bemgr expects: %s`;
+
+        try
+        {
+            enforce(versionStr.length >= "zfs-2.2.6".length, format!errorMsg(versionStr));
+
+            auto parts = versionStr["zfs-".length .. "zfs-2.2.6".length].splitter('.');
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.major = to!int(parts.front);
+
+            parts.popFront();
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.minor = to!int(parts.front);
+
+            parts.popFront();
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.patch = to!int(parts.front);
+
+            parts.popFront();
+            enforce(parts.empty, format!errorMsg(versionStr));
+        }
+        catch(ConvException)
+            throw new Exception(format!errorMsg(versionStr));
+    }
+}
+
+unittest
+{
+    assert(Version("zfs-1.0.0") > Version("zfs-0.0.0"));
+    assert(Version("zfs-1.0.0") == Version("zfs-1.0.0"));
+    assert(Version("zfs-1.0.0") < Version("zfs-2.0.0"));
+
+    assert(Version(0, 1, 0) > Version(0, 0, 0));
+    assert(Version(0, 1, 0) == Version(0, 1, 0));
+    assert(Version(0, 1, 0) < Version(0, 2, 0));
+
+    assert(Version(0, 0, 1) > Version(0, 0, 0));
+    assert(Version(0, 0, 1) == Version(0, 0, 1));
+    assert(Version(0, 0, 1) < Version(0, 0, 2));
+
+    assert(Version(1, 6, 6) > Version(0, 7, 0));
+    assert(Version(1, 6, 6) == Version(1, 6, 6));
+    assert(Version(1, 6, 6) < Version(1, 7, 6));
+
+    assert(Version(2, 6, 6) > Version(2, 6, 5));
+    assert(Version(2, 6, 6) == Version(2, 6, 6));
+    assert(Version(2, 6, 7) < Version(2, 7, 6));
+}
+
 PoolInfo getPoolInfo()
 {
     import std.algorithm.searching : find, startsWith;
@@ -46,6 +134,8 @@ PoolInfo getPoolInfo()
     import std.path : dirName;
     import std.process : esfn = escapeShellFileName;
     import std.string : indexOf, lineSplitter;
+
+    immutable zfsVersion = Version(runCmd("zfs --version", "This system does not have zfs installed"));
 
     auto mounted = getMountedDatasets();
     auto found = mounted.find!(a => a.mountpoint == "/")();
@@ -67,7 +157,7 @@ PoolInfo getPoolInfo()
         enforce(e.dirName == "zroot/ROOT", "This system has boot environments with child datasets");
     }
 
-    return PoolInfo(pool, rootFS, bootFS, mounted);
+    return PoolInfo(zfsVersion, pool, rootFS, bootFS, mounted);
 }
 
 // Realistically, using BigInt is overkill, since boot pools generally aren't

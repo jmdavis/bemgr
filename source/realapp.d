@@ -82,7 +82,7 @@ int doActivate(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
 
-    import bemgr.util : getPoolInfo, promote, runCmd;
+    import bemgr.util : getPoolInfo, promote, runCmd, Version;
 
     bool help;
 
@@ -108,7 +108,25 @@ int doActivate(string[] args)
     // it won't be unmounted and then remounted on top of the currently running
     // OS.
     runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
-    runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(dataset)));
+
+    // Unfortunately, set -u doesn't exist prior to zfs version 2.2.0, and there
+    // isn't a way to do the same thing without it.
+    if(poolInfo.zfsVersion >= Version(2, 2, 0))
+        runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(dataset)));
+    else
+    {
+        if(runCmd(format!"zfs get -Ho value mountpoint %s"(esfn(dataset))) != "/")
+        {
+            if(auto mountpoint = dataset in poolInfo.mountpoints)
+            {
+                throw new Exception(format!
+`The mountpoint property of %s is not "/", but it is mounted, so bemgr cannot fix it for you.
+It needs to be unmounted before it can be activated.`(dataset));
+            }
+            else
+                runCmd(format!"zfs set mountpoint=/ %s"(esfn(dataset)));
+        }
+    }
 
     if(poolInfo.bootFS == dataset)
     {

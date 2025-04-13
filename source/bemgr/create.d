@@ -111,7 +111,7 @@ int doRename(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : stderr, writeln;
 
-    import bemgr.util : getPoolInfo, runCmd;
+    import bemgr.util : getPoolInfo, runCmd, Version;
 
     bool help;
 
@@ -134,13 +134,32 @@ int doRename(string[] args)
     immutable renamingRootFS = poolInfo.rootFS == source;
 
     enforceValidName(newBE, false);
-    runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
 
     // This should never actually be necessary, but if someone has been
     // manually messing with these properties, they could be wrong, so we'll
     // set them back to make sure.
-    runCmd(format!"zfs set canmount=noauto %s"(esfn(target)));
-    runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(target)));
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(source)));
+
+    // Unfortunately, set -u doesn't exist prior to zfs version 2.2.0, and there
+    // isn't a way to do the same thing without it.
+    if(poolInfo.zfsVersion >= Version(2, 2, 0))
+        runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(source)));
+    else
+    {
+        if(runCmd(format!"zfs get -Ho value mountpoint %s"(esfn(source))) != "/")
+        {
+            if(auto mountpoint = source in poolInfo.mountpoints)
+            {
+                throw new Exception(format!
+`The mountpoint property of %s is not "/", but it is mounted, so bemgr cannot fix it for you.
+It needs to be unmounted before it can be renamed.`(source));
+            }
+            else
+                runCmd(format!"zfs set mountpoint=/ %s"(esfn(source)));
+        }
+    }
+
+    runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
 
     if(renamingRootFS)
     {
