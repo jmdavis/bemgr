@@ -46,7 +46,7 @@ PoolInfo getPoolInfo()
     import std.process : esfn = escapeShellFileName;
     import std.string : indexOf;
 
-    auto mounted = getMounted();
+    auto mounted = getMountedDatasets();
     auto found = mounted.find!(a => a.mountpoint == "/")();
     enforce(!found.empty, "Error: This system does not boot from a ZFS pool");
 
@@ -310,7 +310,14 @@ struct Mountpoint
 // This differs from the mountpoint property, since it's possible to use
 // mount -t zfs to mount datasets and snapshots somewhere other than where
 // their mountpoint property indicates.
-Mountpoint[] getMounted()
+// Note that zfs mount unfortunately does not list mounted snapshots (and the
+// mounted property for snapshots seems to always be "-"). bemgr does not
+// currently provide a way to mount snapshots, and commands like destroy will
+// just unmount the snapshot in the process, so this isn't currently an problem,
+// but if we decided to support mounting snapshots, then we might have to handle
+// this differently (or have the affected code paths use a separate function to
+// get the list of mounted snapshots).
+Mountpoint[] getMountedDatasets()
 {
     import std.algorithm.iteration : map;
     import std.array : array;

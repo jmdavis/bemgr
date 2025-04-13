@@ -47,7 +47,7 @@ version(unittest) shared static this()
     enforce(!startList.find!(a => a.name == "zroot/ROOT/default")().empty,
             "zroot/ROOT/default does not exist. Read integration_tests/README.md.");
 
-    auto mounted = getMounted();
+    auto mounted = getMountedDatasets();
     auto defaultMount = "zroot/ROOT/default" in mounted;
     enforce(defaultMount !is null && *defaultMount == "/",
             "/ is not mounted on zroot/ROOT/default. Read integration_tests/README.md.");
@@ -805,7 +805,7 @@ unittest
         bemgr("mount", "foo " ~ esfn(mnt));
 
         {
-            auto mounted = getMounted();
+            auto mounted = getMountedDatasets();
 
             {
                 auto mountpoint = "zroot/ROOT/foo" in mounted;
@@ -1144,13 +1144,13 @@ unittest
     import std.file : exists, mkdirRecurse, rmdir, tempDir;
     import std.format : format;
     import std.path : buildPath;
-    import std.process : esfn = escapeShellFileName;
+    import std.process : esfn = escapeShellFileName, executeShell;
 
     immutable mnt = buildPath(tempDir, "bemgr");
 
     void check(bool isMounted, size_t line = __LINE__)
     {
-        auto mounted = getMounted();
+        auto mounted = getMountedDatasets();
 
         auto default_ = "zroot/ROOT/default" in mounted;
         enforce!AssertError(default_ !is null && *default_ == "/", "default not mounted properly", __FILE__, line);
@@ -1223,6 +1223,13 @@ unittest
     check(true);
 
     bemgr("umount", "foo");
+    check(false);
+
+    immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+    assertThrown(bemgr("mount", format!"%s %s"(origin, esfn(mnt))));
+    // zfs mount does not list snapshots, and the mounted property for snapshots
+    // is always "-".
+    assert(executeShell(format!"mount | grep %s"(esfn(origin))).output.empty);
     check(false);
 
     checkActivated("default");
@@ -1313,7 +1320,7 @@ unittest
 
     void checkFooMount(size_t line = __LINE__)
     {
-        auto mounted = getMounted();
+        auto mounted = getMountedDatasets();
         auto foo = "zroot/ROOT/foo" in mounted;
         enforce!AssertError(foo !is null && *foo == mnt, "unittest failure", __FILE__, line);
     }
@@ -1370,7 +1377,7 @@ unittest
 
     bemgr("create", "foo");
     bemgr("mount", format!"foo %s"(esfn(mnt)));
-    assert("zroot/ROOT/foo" in getMounted());
+    assert("zroot/ROOT/foo" in getMountedDatasets());
 
     bemgr("destroy", "foo");
 
@@ -1396,10 +1403,10 @@ unittest
     {
         bemgr("create", "foo");
         bemgr("mount", format!"foo %s"(esfn(mnt)));
-        assert("zroot/ROOT/foo" in getMounted());
+        assert("zroot/ROOT/foo" in getMountedDatasets());
 
         bemgr("rename", "foo bar");
-        auto bar = "zroot/ROOT/bar" in getMounted();
+        auto bar = "zroot/ROOT/bar" in getMountedDatasets();
         assert(bar !is null && *bar == mnt);
 
         bemgr("destroy", "bar");
@@ -1413,11 +1420,11 @@ unittest
         bemgr("create", "foo");
         bemgr("activate", "foo");
         bemgr("mount", format!"foo %s"(esfn(mnt)));
-        assert("zroot/ROOT/foo" in getMounted());
+        assert("zroot/ROOT/foo" in getMountedDatasets());
         checkActivated("foo", false);
 
         bemgr("rename", "foo bar");
-        auto bar = "zroot/ROOT/bar" in getMounted();
+        auto bar = "zroot/ROOT/bar" in getMountedDatasets();
         assert(bar !is null && *bar == mnt);
         checkActivated("bar", false);
 
@@ -1431,4 +1438,103 @@ unittest
         assert(diff.missing.empty);
         assert(diff.extra.empty);
     }
+}
+
+// Test activate with a mounted snapshot
+unittest
+{
+    import std.exception : assertThrown;
+    import std.file : exists, mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    // Promoting a clone sometimes seems to unmount snapshots and sometimes not,
+    // and it's not entirely clear as to why. So, in that respect, testing this
+    // isn't great, and if the behavior changes, these tests could break.
+    // However, they still have value insofar as it shows that bemgr isn't
+    // choking due to the fact that the snapshot is mounted.
+
+    bemgr("create", "foo");
+    mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
+    assert(buildPath(mnt, "bin").exists);
+    checkActivated("default");
+
+    // Based on testing, it looks like promoting the clone of an origin
+    // unmounts the origin.
+    bemgr("activate", "foo");
+    checkActivated("foo");
+    assert(!buildPath(mnt, "bin").exists);
+
+    bemgr("activate", "default");
+    bemgr("destroy", "foo");
+    checkActivated("default");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test destroy with a mounted snapshot
+unittest
+{
+    import std.exception : assertThrown;
+    import std.file : exists, mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    bemgr("create", "foo");
+    mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
+    assert(buildPath(mnt, "bin").exists);
+    checkActivated("default");
+
+    bemgr("destroy", "foo");
+    assert(!buildPath(mnt, "bin").exists);
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test rename with a mounted snapshot
+unittest
+{
+    import std.exception : assertThrown;
+    import std.file : exists, mkdirRecurse, rmdir, tempDir;
+    import std.format : format;
+    import std.path : buildPath;
+    import std.process : esfn = escapeShellFileName;
+
+    immutable mnt = buildPath(tempDir, "bemgr");
+
+    mkdirRecurse(mnt);
+    scope(exit) rmdir(mnt);
+
+    bemgr("create", "foo");
+    mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
+    assert(buildPath(mnt, "bin").exists);
+    checkActivated("default");
+
+    bemgr("rename", "foo bar");
+    assert(buildPath(mnt, "bin").exists);
+
+    bemgr("destroy", "bar");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
 }

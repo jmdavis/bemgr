@@ -105,6 +105,19 @@ string bemgr(string cmd, string args)
     return runCmd(format!"../bemgr %s %s"(cmd, args));
 }
 
+void mountWithoutZFS(string dsName, string mountpoint)
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+
+    version(FreeBSD)
+        runCmd(format!"mount -t zfs %s %s"(esfn(dsName), esfn(mountpoint)));
+    else version(linux)
+        runCmd(format!"mount -t zfs -o zfsutil %s %s"(esfn(dsName), esfn(mountpoint)));
+    else
+        static assert("Unsupported OS");
+}
+
 auto getCurrDSList()
 {
     import std.algorithm.sorting : sort;
@@ -223,7 +236,7 @@ unittest
 // This differs from the mountpoint property, since it's possible to use
 // mount -t zfs to mount datasets and snapshots somewhere other than where
 // their mountpoint property indicates.
-string[string] getMounted()
+string[string] getMountedDatasets()
 {
     import std.algorithm.searching : find;
     import std.string : lineSplitter, representation, stripRight;
@@ -294,7 +307,7 @@ void checkActivated(string activated, string[] otherNotClones = null,
 
         if(checkMounted)
         {
-            auto mounted = getMounted();
+            auto mounted = getMountedDatasets();
             if(e.name == fullDN)
             {
                 auto mountpoint = fullDN in mounted;
