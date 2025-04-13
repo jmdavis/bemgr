@@ -92,9 +92,7 @@ bemgr create <beName@snapshot>
         enforceDSExists(origin);
     }
 
-    runCmd(format!"zfs clone %s %s"(esfn(origin), esfn(clone)));
-    runCmd(format!"zfs set canmount=noauto %s"(esfn(clone)));
-    runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(clone)));
+    runCmd(format!"zfs clone -o canmount=noauto -o mountpoint=/ %s %s"(esfn(origin), esfn(clone)));
 
     return 0;
 }
