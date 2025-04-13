@@ -101,19 +101,19 @@ int doActivate(string[] args)
     auto poolInfo = getPoolInfo();
     immutable dataset = buildPath(poolInfo.beParent, beName);
 
-    if(poolInfo.bootFS == dataset)
-        writeln("Already activated");
+    // These two should already be the case, since they're set when the boot
+    // environment is created, but we can't guarantee that no one has messed
+    // with them since then, so better safe than sorry. set -u needs to be used
+    // with mountpoint to ensure that if the dataset has already been mounted,
+    // it won't be unmounted and then remounted on top of the currently running
+    // OS.
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
+    runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(dataset)));
 
-    if(poolInfo.rootFS != dataset)
+    if(poolInfo.bootFS == dataset)
     {
-        // These two should already be the case, since they're set when the
-        // boot environment is created, but we can't guarantee that no one has
-        // messed with them since then, so better safe than sorry.
-        // set -u needs to be used with mountpoint to ensure that if the
-        // dataset has already been mounted, it won't be unmounted and then
-        // remounted on top of the currently running OS.
-        runCmd(format!"zfs set canmount=noauto %s"(esfn(dataset)));
-        runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(dataset)));
+        writeln("Already activated");
+        return 0;
     }
 
     immutable origin = runCmd(format!"zfs list -Ho origin %s"(esfn(dataset)),

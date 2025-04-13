@@ -138,6 +138,12 @@ int doRename(string[] args)
     enforceValidName(newBE, false);
     runCmd(format!"zfs rename -u %s %s"(esfn(source), esfn(target)));
 
+    // This should never actually be necessary, but if someone has been
+    // manually messing with these properties, they could be wrong, so we'll
+    // set them back to make sure.
+    runCmd(format!"zfs set canmount=noauto %s"(esfn(target)));
+    runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(target)));
+
     if(renamingRootFS)
     {
         // This should never happen, but it is technically possible if the
