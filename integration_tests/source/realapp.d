@@ -55,6 +55,12 @@ version(unittest) shared static this()
     enforce(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default",
             "bootfs is not set to zroot/ROOT/default. Read integration_tests/README.md.");
 
+    enforce(zfsGet("canmount", "zroot/ROOT/default") == "noauto",
+            `canmount is not set to "noauto" for zroot/ROOT/default. Read integration_tests/README.md.`);
+
+    enforce(zfsGet("mountpoint", "zroot/ROOT/default") == "/",
+            `mountpoint is not set to "/" for zroot/ROOT/default. Read integration_tests/README.md.`);
+
     enforce(startList.find!(a => a.name.startsWith("zroot/ROOT/default/")).empty,
             "zroot/ROOT/default has child datasets. Read integration_tests/README.md.");
 
@@ -1532,6 +1538,61 @@ unittest
     assert(buildPath(mnt, "bin").exists);
 
     bemgr("destroy", "bar");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test activate when canmount and/or mountpoint having been changed
+unittest
+{
+    bemgr("create", "foo");
+
+    runCmd("zfs set canmount=off zroot/ROOT/foo");
+    bemgr("activate", "foo");
+    checkActivated("foo");
+
+    bemgr("activate", "default");
+    checkActivated("default");
+
+    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/foo");
+    bemgr("activate", "foo");
+    checkActivated("foo");
+
+    bemgr("activate", "default");
+    checkActivated("default");
+
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test rename when canmount and/or mountpoint having been changed
+unittest
+{
+    runCmd("zfs set canmount=on zroot/ROOT/default");
+    bemgr("rename", "default unfault");
+    checkActivated("unfault", "unfault");
+
+    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/unfault");
+    bemgr("rename", "unfault default");
+    checkActivated("default");
+
+    bemgr("create", "foo");
+    runCmd("zfs set canmount=off zroot/ROOT/foo");
+    bemgr("rename", "foo bar");
+    checkActivated("default");
+
+    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/bar");
+    bemgr("rename", "bar foo");
+    checkActivated("default");
+
+    bemgr("destroy", "foo");
 
     checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
