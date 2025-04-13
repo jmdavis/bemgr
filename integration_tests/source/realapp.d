@@ -1599,3 +1599,101 @@ unittest
     assert(diff.missing.empty);
     assert(diff.extra.empty);
 }
+
+// Test bemgr destroy with origins that should not be destroyed
+unittest
+{
+    import std.format : format;
+    import std.process : esfn = escapeShellFileName;
+
+    bemgr("create", "foo");
+    immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+    bemgr("create", format!"-e %s bar"(esfn(origin["zroot/ROOT/".length .. $])));
+
+    bemgr("destroy", "foo");
+    assert(dsExists(origin));
+
+    runCmd(format!"zfs clone %s zroot/bemgr_foobar"(esfn(origin)));
+    bemgr("destroy", "bar");
+    assert(dsExists(origin));
+
+    {
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.length == 2);
+        assert(diff.extra[0].name == origin);
+        assert(diff.extra[1].name == "zroot/bemgr_foobar");
+    }
+
+    runCmd(format!"zfs destroy -R %s"(esfn(origin)));
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test bemgr destroy when a child dataset of a BE was created
+unittest
+{
+    import std.exception : assertThrown;
+
+    bemgr("create", "foo");
+    runCmd("zfs create zroot/ROOT/foo/bar");
+
+    {
+        auto before = getCurrDSList();
+        assertThrown(bemgr("destroy", "foo"));
+
+        auto diff = diffNameList(before, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+
+    runCmd("zfs destroy zroot/ROOT/foo/bar");
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test bemgr activate when a child dataset of a BE was created
+unittest
+{
+    import std.exception : assertThrown;
+
+    bemgr("create", "foo");
+    runCmd("zfs create zroot/ROOT/foo/bar");
+    assertThrown(bemgr("activate", "foo/bar"));
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+
+    runCmd("zfs destroy zroot/ROOT/foo/bar");
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test bemgr list when a child dataset of a BE was created
+unittest
+{
+    import std.exception : assertThrown;
+
+    bemgr("create", "foo");
+    runCmd("zfs create zroot/ROOT/foo/bar");
+    assertThrown(bemgr("list", ""));
+    assert(zpoolGet("bootfs", "zroot") == "zroot/ROOT/default");
+
+    runCmd("zfs destroy zroot/ROOT/foo/bar");
+    bemgr("destroy", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
