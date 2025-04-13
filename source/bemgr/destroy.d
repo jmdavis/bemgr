@@ -133,9 +133,19 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     {
         foreach(e; di.toPromote)
             promote(e);
+
+        auto origin = di.origin;
+        immutable destroyOrigin = !origin.empty && !keep;
+
+        // We need to grab the origin again just in case one of the promotions
+        // moved the origin to another dataset.
+        if(!di.toPromote.empty && destroyOrigin)
+            origin = runCmd(format!"zfs get -Ho value origin %s"(esfn(di.dataset)));
+
         runCmd(format!"zfs destroy%s -r %s"(force ? " -f" : "", esfn(di.dataset)));
-        if(!di.origin.empty && !keep)
-            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(di.origin)));
+
+        if(destroyOrigin)
+            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(origin)));
 
         // Just in case promoting any clones turned the next active BE into a
         // clone.
