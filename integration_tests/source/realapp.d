@@ -1718,18 +1718,20 @@ Dataset (and its Snapshots) to be Destroyed:
     +/
     assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 5);
 
-    immutable origin = zfsGet("origin", "zroot/ROOT/foo");
-    bemgr("create", format!"-e %s bar"(esfn(origin["zroot/ROOT/".length .. $])));
+    {
+        immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+        bemgr("create", format!"-e %s bar"(esfn(origin["zroot/ROOT/".length .. $])));
 
-    // e.g.
-    /+
+        // e.g.
+        /+
 Dataset (and its Snapshots) to be Destroyed:
   zroot/ROOT/foo
-    +/
-    assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 2);
+        +/
+        assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 2);
 
-    bemgr("destroy", "foo");
-    assert(dsExists(origin));
+        bemgr("destroy", "foo");
+        assert(dsExists(origin));
+    }
 
     // e.g.
     /+
@@ -1741,6 +1743,107 @@ Dataset (and its Snapshots) to be Destroyed:
      +/
     assert(bemgr("destroy", "-n bar").lineSplitter().walkLength() == 5);
     bemgr("destroy", "bar");
+
+    {
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+
+    bemgr("create", "foo");
+    bemgr("create", "foo@bar");
+    bemgr("create", "-e foo@bar bar");
+
+    // e.g.
+    /+
+Clones to be Promoted:
+  zroot/ROOT/bar
+
+Origin Snapshot to be Destroyed:
+  zroot/ROOT/default@bemgr_2025-04-13T08:28:41.435-06:00
+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/foo
+     +/
+    assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 8);
+
+    /+
+Origin Snapshot to be Destroyed:
+  zroot/ROOT/foo@bar
+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/bar
+     +/
+    assert(bemgr("destroy", "-n bar").lineSplitter().walkLength() == 5);
+    bemgr("destroy", "foo");
+    bemgr("destroy", "bar");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
+
+// Test bemgr destroy where there are multiple origin snapshots with the same
+// creation time.
+unittest
+{
+    import core.thread : Thread;
+    import core.time : seconds;
+    import std.exception : enforce;
+    import std.range : walkLength;
+    import std.string : lineSplitter;
+
+    bemgr("create", "foo");
+    bemgr("create", "foo@one");
+    bemgr("create", "foo@two");
+    Thread.sleep(seconds(1));
+    bemgr("create", "foo@three");
+    bemgr("create", "foo@four");
+    Thread.sleep(seconds(1));
+
+    for(int attempt; true; ++attempt)
+    {
+        bemgr("create", "foo@five");
+        bemgr("create", "foo@six");
+
+        immutable fiveTime = zfsGet("-p creation", "zroot/ROOT/foo@five");
+        immutable sixTime = zfsGet("-p creation", "zroot/ROOT/foo@six");
+
+        if(fiveTime == sixTime)
+            break;
+
+        enforce(attempt != 10, "Failed to create two snapshots with the same creation time");
+        bemgr("destroy", "foo@five");
+        bemgr("destroy", "foo@six");
+    }
+
+    Thread.sleep(seconds(1));
+    bemgr("create", "foo@seven");
+    bemgr("create", "foo@eight");
+
+    bemgr("create", "-e foo@five bar");
+    bemgr("create", "-e foo@six baz");
+
+    // e.g.
+    /+
+Clones to be Promoted:
+  zroot/ROOT/bar
+  zroot/ROOT/baz
+
+Origin Snapshot to be Destroyed:
+  zroot/ROOT/default@bemgr_2025-04-12T17:41:25.776-06:00
+
+Dataset (and its Snapshots) to be Destroyed:
+  zroot/ROOT/foo
+     +/
+    assert(bemgr("destroy", "-n foo").lineSplitter().walkLength() == 9);
+    bemgr("destroy", "foo");
+    checkActivated("default");
+
+    bemgr("destroy", "bar");
+    bemgr("destroy", "baz");
 
     checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
