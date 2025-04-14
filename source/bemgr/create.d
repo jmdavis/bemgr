@@ -111,7 +111,7 @@ int doRename(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : stderr, writeln;
 
-    import bemgr.util : getPoolInfo, runCmd, Version;
+    import bemgr.util : getPoolInfo, runCmd, versionWithSetU, Version;
 
     bool help;
 
@@ -142,7 +142,7 @@ int doRename(string[] args)
 
     // Unfortunately, set -u doesn't exist prior to zfs version 2.2.0, and there
     // isn't a way to do the same thing without it.
-    if(poolInfo.zfsVersion >= Version(2, 2, 0))
+    if(poolInfo.zfsVersion >= versionWithSetU)
         runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(source)));
     else
     {

@@ -11,6 +11,8 @@ import std.bigint : BigInt;
 import std.datetime : DateTime, Month;
 import std.range.primitives;
 
+enum versionWithSetU = Version(2, 2, 0);
+
 struct PoolInfo
 {
     Version zfsVersion;

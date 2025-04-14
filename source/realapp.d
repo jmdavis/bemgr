@@ -82,7 +82,7 @@ int doActivate(string[] args)
     import std.process : esfn = escapeShellFileName;
     import std.stdio : writefln, writeln;
 
-    import bemgr.util : getPoolInfo, promote, runCmd, Version;
+    import bemgr.util : getPoolInfo, promote, runCmd, versionWithSetU, Version;
 
     bool help;
 
@@ -111,7 +111,7 @@ int doActivate(string[] args)
 
     // Unfortunately, set -u doesn't exist prior to zfs version 2.2.0, and there
     // isn't a way to do the same thing without it.
-    if(poolInfo.zfsVersion >= Version(2, 2, 0))
+    if(poolInfo.zfsVersion >= versionWithSetU)
         runCmd(format!"zfs set -u mountpoint=/ %s"(esfn(dataset)));
     else
     {
