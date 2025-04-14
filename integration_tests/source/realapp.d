@@ -863,13 +863,13 @@ unittest
     }
 
     {
-        bemgr("export", "default > /dev/null");
+        bemgr("export", "default | cat > /dev/null");
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
         assert(diff.extra.empty);
     }
     {
-        bemgr("export", "-k default > /dev/null");
+        bemgr("export", "-k default | cat > /dev/null");
         auto diff = diffNameList(startList, getCurrDSList());
         assert(diff.missing.empty);
         assert(diff.extra.length == 1);
