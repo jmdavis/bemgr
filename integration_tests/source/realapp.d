@@ -1462,20 +1462,46 @@ unittest
 
     // Promoting a clone sometimes seems to unmount snapshots and sometimes not,
     // and it's not entirely clear as to why. So, in that respect, testing this
-    // isn't great, and if the behavior changes, these tests could break.
-    // However, they still have value insofar as it shows that bemgr isn't
-    // choking due to the fact that the snapshot is mounted.
+    // isn't great, and if the behavior changes, these tests could break. The
+    // behavior also seems to differ between FreeBSD and Linux.
+    // However, having some testing for this still have value insofar as it
+    // shows that bemgr isn't choking due to the fact that the snapshot is
+    // mounted.
+    // I suppose that we could make activate check for snapshots being mounted,
+    // but that's more complication for something that shouldn't happen under
+    // anything approaching normal circumstances.
 
     bemgr("create", "foo");
     mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
     assert(buildPath(mnt, "bin").exists);
     checkActivated("default");
 
-    // Based on testing, it looks like promoting the clone of an origin
-    // unmounts the origin.
-    bemgr("activate", "foo");
-    checkActivated("foo");
-    assert(!buildPath(mnt, "bin").exists);
+    version(FreeBSD)
+    {
+        // Based on testing, it looks like promoting the clone of an origin
+        // unmounts the origin.
+        bemgr("activate", "foo");
+        checkActivated("foo");
+        assert(!buildPath(mnt, "bin").exists);
+    }
+    else version(linux)
+    {
+        // Based on testing, it looks like promoting the clone of an origin
+        // results in complaints that the device is busy if the origin is
+        // mounted. This probably relates to how Linux doesn't seem to have a
+        // way to forcibly unmount stuff.
+        assertThrown(bemgr("activate", "foo"));
+        checkActivated("default");
+        assert(buildPath(mnt, "bin").exists);
+
+        runCmd(format!"umount %s"(esfn(mnt)));
+        assert(!buildPath(mnt, "bin").exists);
+
+        bemgr("activate", "foo");
+        checkActivated("foo");
+    }
+    else
+        static assert(false, "Unsupported OS");
 
     bemgr("activate", "default");
     bemgr("destroy", "foo");
@@ -1501,18 +1527,50 @@ unittest
     mkdirRecurse(mnt);
     scope(exit) rmdir(mnt);
 
-    bemgr("create", "foo");
-    mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
-    assert(buildPath(mnt, "bin").exists);
-    checkActivated("default");
+    {
+        bemgr("create", "foo");
+        mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
+        assert(buildPath(mnt, "bin").exists);
+        checkActivated("default");
 
-    bemgr("destroy", "foo");
-    assert(!buildPath(mnt, "bin").exists);
+        // It seems that FreeBSD isn't inclined to complain about the device
+        // being busy if the origin snapshot is mounted, but Linux is.
+        version(FreeBSD)
+        {
+            bemgr("destroy", "foo");
+            assert(!buildPath(mnt, "bin").exists);
+        }
+        else version(linux)
+        {
+            immutable origin = zfsGet("origin", "zroot/ROOT/foo");
+            assertThrown(bemgr("destroy", "foo"));
+            assert(buildPath(mnt, "bin").exists);
+            runCmd(format!"umount %s"(mnt));
+            assert(!buildPath(mnt, "bin").exists);
+            runCmd(format!"zfs destroy %s"(esfn(origin)));
+        }
+        else
+            static assert(false, "Unsupported OS");
 
-    checkActivated("default");
-    auto diff = diffNameList(startList, getCurrDSList());
-    assert(diff.missing.empty);
-    assert(diff.extra.empty);
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "foo");
+        mountWithoutZFS(zfsGet("origin", "zroot/ROOT/foo"), mnt);
+        assert(buildPath(mnt, "bin").exists);
+        checkActivated("default");
+
+        bemgr("destroy", "-F foo");
+        assert(!buildPath(mnt, "bin").exists);
+
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
 }
 
 // Test rename with a mounted snapshot
@@ -1537,7 +1595,7 @@ unittest
     bemgr("rename", "foo bar");
     assert(buildPath(mnt, "bin").exists);
 
-    bemgr("destroy", "bar");
+    bemgr("destroy", "-F bar");
 
     checkActivated("default");
     auto diff = diffNameList(startList, getCurrDSList());
@@ -1557,7 +1615,7 @@ unittest
     bemgr("activate", "default");
     checkActivated("default");
 
-    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/foo");
+    runCmd("zfs set mountpoint=/foobar zroot/ROOT/foo");
     bemgr("activate", "foo");
     checkActivated("foo");
 
@@ -1579,7 +1637,9 @@ unittest
     bemgr("rename", "default unfault");
     checkActivated("unfault", "unfault");
 
-    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/unfault");
+    if(zfsHasSetU())
+        runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/unfault");
+
     bemgr("rename", "unfault default");
     checkActivated("default");
 
@@ -1588,7 +1648,7 @@ unittest
     bemgr("rename", "foo bar");
     checkActivated("default");
 
-    runCmd("zfs set -u mountpoint=/foobar zroot/ROOT/bar");
+    runCmd("zfs set mountpoint=/foobar zroot/ROOT/bar");
     bemgr("rename", "bar foo");
     checkActivated("default");
 

@@ -86,6 +86,11 @@ string zfsGet(string prop, string dataset)
     return runCmd(format!"zfs get -Ho value %s %s"(prop, dataset));
 }
 
+bool zfsHasSetU()
+{
+    return Version(runCmd("zfs --version")) >= Version(2, 2, 0);
+}
+
 string runCmd(string cmd)
 {
     import std.exception : enforce;
@@ -332,4 +337,92 @@ void checkActivated(string activated, string[] otherNotClones = null,
     immutable bootFS = zpoolGet("bootfs", "zroot");
     enforce!AssertError(bootFS == format!"zroot/ROOT/%s"(activated),
                         format!"wrong activated: %s"(bootFS), file, line);
+}
+
+private:
+
+struct Version
+{
+    int major;
+    int minor;
+    int patch;
+
+    int opCmp(Version rhs)
+    {
+        if(this.major < rhs.major)
+            return -1;
+        if(this.major > rhs.major)
+            return 1;
+        if(this.minor < rhs.minor)
+            return -1;
+        if(this.minor > rhs.minor)
+            return 1;
+        if(this.patch < rhs.patch)
+            return -1;
+        if(this.patch > rhs.patch)
+            return 1;
+        return 0;
+    }
+
+    this(int major, int minor, int patch)
+    {
+        this.major = major;
+        this.minor = minor;
+        this.patch = patch;
+    }
+
+    this(string versionStr)
+    {
+        import std.algorithm.iteration : splitter;
+        import std.conv : ConvException, to;
+        import std.exception : enforce;
+        import std.format : format;
+
+        enum errorMsg = `The format of "zfs --version" is not what bemgr expects: %s`;
+
+        try
+        {
+            enforce(versionStr.length >= "zfs-2.2.6".length, format!errorMsg(versionStr));
+
+            auto parts = versionStr["zfs-".length .. "zfs-2.2.6".length].splitter('.');
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.major = to!int(parts.front);
+
+            parts.popFront();
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.minor = to!int(parts.front);
+
+            parts.popFront();
+            enforce(!parts.empty, format!errorMsg(versionStr));
+            this.patch = to!int(parts.front);
+
+            parts.popFront();
+            enforce(parts.empty, format!errorMsg(versionStr));
+        }
+        catch(ConvException)
+            throw new Exception(format!errorMsg(versionStr));
+    }
+}
+
+unittest
+{
+    assert(Version("zfs-1.0.0") > Version("zfs-0.0.0"));
+    assert(Version("zfs-1.0.0") == Version("zfs-1.0.0"));
+    assert(Version("zfs-1.0.0") < Version("zfs-2.0.0"));
+
+    assert(Version(0, 1, 0) > Version(0, 0, 0));
+    assert(Version(0, 1, 0) == Version(0, 1, 0));
+    assert(Version(0, 1, 0) < Version(0, 2, 0));
+
+    assert(Version(0, 0, 1) > Version(0, 0, 0));
+    assert(Version(0, 0, 1) == Version(0, 0, 1));
+    assert(Version(0, 0, 1) < Version(0, 0, 2));
+
+    assert(Version(1, 6, 6) > Version(0, 7, 0));
+    assert(Version(1, 6, 6) == Version(1, 6, 6));
+    assert(Version(1, 6, 6) < Version(1, 7, 6));
+
+    assert(Version(2, 6, 6) > Version(2, 6, 5));
+    assert(Version(2, 6, 6) == Version(2, 6, 6));
+    assert(Version(2, 6, 7) < Version(2, 7, 6));
 }
