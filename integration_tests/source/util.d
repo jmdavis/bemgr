@@ -113,7 +113,17 @@ void mountWithoutZFS(string dsName, string mountpoint)
     version(FreeBSD)
         runCmd(format!"mount -t zfs %s %s"(esfn(dsName), esfn(mountpoint)));
     else version(linux)
-        runCmd(format!"mount -t zfs -o zfsutil %s %s"(esfn(dsName), esfn(mountpoint)));
+    {
+        import std.string : indexOf;
+
+        // This is just dumb, but for some reason, on Linux, mount -t won't
+        // work with datasets, requiring -o zfsutil, but -o zfsutil won't work
+        // with snapshots.
+        if(mountpoint.indexOf('@') != -1)
+            runCmd(format!"mount -t zfs -o zfsutil %s %s"(esfn(dsName), esfn(mountpoint)));
+        else
+            runCmd(format!"mount -t zfs %s %s"(esfn(dsName), esfn(mountpoint)));
+    }
     else
         static assert("Unsupported OS");
 }
