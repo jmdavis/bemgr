@@ -113,8 +113,10 @@ used to load both zfsbootmenu and the boot loaders for other operating systems.
 be possible to use GRUB with bemgr, but GRUB is not designed around using ZFS
 boot environments, and it does not support recent ZFS features.
 
-# Installation
-
-# Commands
+# `bemgr` Commands
 
 See [usage](usage.md)
+
+# Building `bemgr`
+
+See [building](building.md)

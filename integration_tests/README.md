@@ -1,3 +1,5 @@
+# The Integration Tests for `bemgr`
+
 Do _not_ run these tests on a system that you actually care about. They assume
 that they can do whatever they need to with the boot pool to test `bemgr`'s
 functionality.
@@ -22,7 +24,7 @@ current setup gets destroyed if things go wrong.
 
 The tests create a variety of combinations of datasets, snapshots, and clones
 and run the various `bemgr` commands on the pool to ensure that each of the
-commands functions properly. Many of the combinations are combinations that
+commands functions properly. Some of the combinations are combinations that
 should not happen in practice (e.g. a boot environment with child datasets or
 snapshots which have the exact same creation time). Not only is `bemgr` tested
 with the datasets and snapshots having been created purely with `bemgr`, but
@@ -39,7 +41,7 @@ To run the tests, just run
 sudo dub test
 ```
 
-from within the integration\_tests directory. It will do a clean build of
+from within the `integration_tests` directory. It will do a clean build of
 `bemgr` in the main directory and then run the integration tests using that
 `bemgr` executable. The tests themselves are implemented within the `unittest`
-blocks of the integration\_tests executable.
+blocks of the `integration_tests` executable.
