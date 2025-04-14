@@ -52,7 +52,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     import std.format : format;
     import std.getopt : config, getopt;
     import std.path : buildPath;
-    import std.process : esfn = escapeShellFileName;
+    import std.process : esfn = escapeShellFileName, executeShell;
     import std.stdio : writefln, writeln;
     import std.string : indexOf, lineSplitter;
 
@@ -66,7 +66,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
     getopt(args, config.bundling,
            "k", &keep,
            "n", &dryRun,
-           "f", &force,
+           "F", &force,
            "help", &help);
 
     if(help)
@@ -134,6 +134,11 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         foreach(e; di.toPromote)
             promote(e);
 
+        // Just in case promoting any clones turned the next active BE into a
+        // clone.
+        if(!di.toPromote.empty)
+            promote(poolInfo.bootFS);
+
         auto origin = di.origin;
         immutable destroyOrigin = !origin.empty && !keep;
 
@@ -145,12 +150,11 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         runCmd(format!"zfs destroy%s -r %s"(force ? " -f" : "", esfn(di.dataset)));
 
         if(destroyOrigin)
-            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(origin)));
-
-        // Just in case promoting any clones turned the next active BE into a
-        // clone.
-        if(!di.toPromote.empty)
-            promote(poolInfo.bootFS);
+        {
+            if(force && !executeShell(format!"mount | grep %s"(esfn(origin))).output.empty)
+                runCmd(format!"umount %s"(esfn(origin)));
+            runCmd(format!"zfs destroy %s"(esfn(origin)));
+        }
     }
 
     return 0;
