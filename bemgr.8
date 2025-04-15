@@ -93,7 +93,8 @@ By creating a new boot environment by cloning an existing one, it makes it
 possible to save the current state of the OS when upgrading and easily restore
 it if the upgrade fails.
 .Pp
-FreeBSD documentation on boot environments:
+.Fx
+documentation on boot environments:
 .Lk https://wiki.freebsd.org/BootEnvironments
 .Pp
 zfsbootmenu documentation on boot environments:
@@ -109,11 +110,12 @@ zroot/ROOT/testing_some_package
 .Pp
 The pool name of course does not matter, and the parent dataset doesn't need to
 be named
-.Pa ROOT Ns ,
-but it's common practice. Each dataset under the parent dataset is a separate
-boot environment. Each boot environment dataset contains the root of the
-filesystem, allowing you to have separate copies, making rolling back changes
-easy. And since the combination of
+.Pa ROOT ,
+but it's common practice.
+Each dataset under the parent dataset is a separate boot environment.
+Each boot environment dataset contains the root of the filesystem, allowing you
+to have separate copies, making rolling back changes easy.
+And since the combination of
 .Sy zfs\ snap
 and
 .Sy zfs\ clone
@@ -125,7 +127,7 @@ So, COW (copy\-on\-write) comes to the rescue as it often does with ZFS.
 Each boot environment should have its
 .Em mountpoint
 property set to
-.Pa / Ns ,
+.Pa / ,
 and its
 .Em canmount
 property should be set to
@@ -134,7 +136,8 @@ so that it does not get mounted automatically.
 The
 .Em bootfs
 property on the pool will then tell the boot manager which boot environment to
-.No mount as root by default (e.g. Sy bootfs=zroot/ROOT/default Ns ).
+mount as root by default (e.g.
+.Sy bootfs=zroot/ROOT/default Ns ).
 .Pp
 .Nm
 expects that boot environments will not have any child datasets.
@@ -214,13 +217,13 @@ is not used, then the new BE is created from the currently active BE.
 For instance, if
 .Pa default
 were the current BE, and the parent of the BE datasets is
-.Pa zroot/ROOT Ns ,
+.Pa zroot/ROOT ,
 then
 .Sy bemgr\ create\ foo
 will take a snapshot of
 .Pa zroot/ROOT/default
 and clone that snapshot to create
-.Pa zroot/ROOT/foo Ns .
+.Pa zroot/ROOT/foo .
 .Pp
 If
 .Fl e
@@ -229,7 +232,8 @@ is used, then the new BE is created by taking a snapshot of the BE provided to
 .Fl e
 rather than the currently active BE.
 It is then cloned just like would have occurred if the snapshot had been from
-the current BE. For instance,
+the current BE.
+For instance,
 .Sy bemgr\ create\ \-e\ foo\ bar
 would create a snapshot of
 .Pa zroot/ROOT/foo
@@ -245,12 +249,12 @@ snapshot is cloned.
 So, if
 .Pa zroot/ROOT/foo
 had the snapshot
-.Pa zroot/ROOT/foo@2025\-04\-02_update Ns ,
+.Pa zroot/ROOT/foo@2025\-04\-02_update ,
 .Sy bemgr\ \-e\ foo@2025\-04\-02_update\ bar
 would clone
 .Pa zroot/ROOT/foo@2025\-04\-02_update
 and create
-.Pa zroot/ROOT/bar Ns .
+.Pa zroot/ROOT/bar .
 .Pp
 The newly created boot environment has its
 .Em canmount
@@ -259,7 +263,7 @@ property set to
 and its
 .Em mountpoint
 property set to
-.Pa / Ns .
+.Pa / .
 .It Xo
 .Cm create
 .Ar beName@snapshot
@@ -267,15 +271,17 @@ property set to
 Rather than creating a new boot environment, this just creates a snapshot of a
 boot environment.
 For instance, if the parent of the BE datasets is
-.Pa zroot/ROOT Ns , then
+.Pa zroot/ROOT ,
+then
 .Sy bemgr\ foo@bar
 would take a snapshot of
 .Pa zroot/ROOT/foo
 which was
-.Pa zroot/ROOT/foo@bar Ns . So,
+.Pa zroot/ROOT/foo@bar .
+So,
 .Sy bemgr\ create\ foo@bar
 would be equivalent to
-.Sy zfs\ snap\ zroot/ROOT/foo@bar Ns .
+.Sy zfs\ snap\ zroot/ROOT/foo@bar .
 .It Xo
 .Cm destroy
 .Op Fl k
@@ -362,7 +368,7 @@ is the parent dataset of the BEs, then
 will destroy
 .Pa zroot/ROOT/foo@bar
 and would be equivalent to
-.Sy zfs\ destroy\ zroot/ROOT/foo@bar Ns .
+.Sy zfs\ destroy\ zroot/ROOT/foo@bar .
 .Pp
 If the given snapshot is the origin of another dataset, then an error will be
 printed out, and nothing will be destroyed.
@@ -393,7 +399,7 @@ Takes a snapshot of the given BE and does
 on it to
 .Em stdout
 so that it can be piped or redirected to a file, or to
-.Sy ssh Ns ,
+.Sy ssh ,
 etc.
 .Pp
 .Fl k
@@ -410,7 +416,7 @@ makes the output verbose.
 Takes a dataset from
 .Em stdin
 (presumably having been read from a file or
-.Sy ssh Ns )
+.Sy ssh )
 which is then used with
 .Sy zfs\ recv
 to create a new boot environment with the given name.
@@ -419,7 +425,7 @@ to create a new boot environment with the given name.
 makes the output verbose, though
 .Sy zfs\ recv
 doesn't print out much with
-.Fl v Ns .
+.Fl v .
 .Sy zfs\ send
 is the end that gets the output that actually indicates the progress of the
 stream, so
@@ -435,7 +441,7 @@ property set to
 and its
 .Em mountpoint
 property set to
-.Pa / Ns .
+.Pa / .
 .It Xo
 .Cm list
 .Op Fl H
@@ -467,16 +473,16 @@ default                            NR      /            75.18G      59.04G   66.
 The name of the boot environment
 .It Active
 The active boot environment is the one that's mounted as root.
-.Sy Dq \-
+.Qq \-
 means that that BE is inactive.
-.Sy Dq N
+.Qq N
 means that that BE is the active boot environment now, and
-.Sy Dq R
+.Qq R
 means that it will be the active boot environment when the system is next
 rebooted.
 .It Mountpoint
 The current mountpoint of the BE.
-.Sy Dq \-
+.Qq \-
 means that that boot environment is not currently mounted and does not say
 anything about the
 .Em mountpoint
@@ -487,7 +493,7 @@ for a BE's dataset).
 The currently active BE will show
 .Pa /
 as its mountpoint, and any other BE which shows a mountpoint other than
-.Sy Dq \-
+.Qq \-
 will be showing its current mountpoint and not the
 .Em mountpoint
 property of the dataset.
@@ -495,12 +501,12 @@ Normally, no BEs other than the currently active one will be mounted, but it is
 possible to mount them using
 .Sy bemgr\ mount
 or via
-.Sy mount Ns .
+.Sy mount .
 .It Space
 For BEs whose dataset is not a clone, this is equivalent to the
 .Em used
-property of the dataset. For BEs whose dataset is a clone of a snapshot, it's
-equivalent to the
+property of the dataset.
+For BEs whose dataset is a clone of a snapshot, it's equivalent to the
 .Em used
 property of the dataset + the
 .Em used
@@ -547,7 +553,6 @@ This is the
 .Em creation
 property of the BE's dataset, which gives the date/time that the BE was created.
 .El
-.Pp
 .It Xo
 .Cm list
 .Fl a
@@ -563,7 +568,7 @@ If
 is provided, then the snapshots are also listed
 .Pf ( Fl s
 implies
-.Fl a Ns ,
+.Fl a ,
 so if it's used on its own, it's equivalent to
 .Fl as Ns ).
 .Pp
@@ -702,8 +707,9 @@ The columns are basically the same as with
 without
 .Fl a
 except that there is no
-.Em If Last Ns .
-However, the column for names is obviously slightly different. In the case of
+.Em If Last .
+However, the column for names is obviously slightly different.
+In the case of
 .Bd -literal
 2025\-02\-04_update
   zroot/ROOT/2025\-02\-04_update                                \-       \-           698.62M      56.66G  2025\-02\-04 19:22:18
@@ -718,7 +724,7 @@ is the dataset for that BE, and
 is the origin snapshot of that dataset.
 Since the dataset has no snapshots of
 its own, that's the entire list even with
-.Fl s Ns ,
+.Fl s ,
 whereas if it had additional snapshots, they'd be listed after the origin.
 For instance, if
 .Em 2025\-02\-04_update
@@ -741,20 +747,22 @@ when it's promoted.
 .Ar beName
 .Ar mountpoint
 .Xc
-This mounts the given boot environment at the given mountpoint. It has no
-effect on the
+This mounts the given boot environment at the given mountpoint.
+It has no effect on the
 .Em mountpoint
 property of the dataset.
 It's intended for use cases where you need to access the contents of a boot
 environment without actually booting it.
 .Pp
 For instance, if the parent dataset of the BEs is
-.Pa zroot/ROOT Ns ,
+.Pa zroot/ROOT ,
 then
 .Sy bemgr\ mount\ foo\ /mnt
 would be equivalent to
 .Sy mount\ \-t\ zfs\ zroot/ROOT/foo\ /mnt
-on FreeBSD or
+on
+.Fx
+or
 .Sy mount\ \-t\ zfs\ \-o\ zfsutil\ zroot/ROOT/foo\ /mnt
 on Linux.
 .Pp
@@ -768,11 +776,11 @@ This renames the given boot environment.
 It has no effect on mounting.
 .Pp
 For instance, if the parent dataset of the BEs is
-.Pa zroot/ROOT Ns ,
+.Pa zroot/ROOT ,
 then
 .Sy bemgr\ rename\ foo\ bar
 would be equivalent to
-.Sy zfs\ rename\ \-u\ zroot/ROOT/foo\ zroot/ROOT/bar Ns .
+.Sy zfs\ rename\ \-u\ zroot/ROOT/foo\ zroot/ROOT/bar .
 .Pp
 In addition, if the BE in the
 .Sy bootfs
@@ -794,13 +802,14 @@ This unmounts the given boot environment (but will not work on the currently
 active boot environment).
 .Pp
 For instance, if the parent dataset of the BEs is
-.Pa zroot/ROOT Ns ,
+.Pa zroot/ROOT ,
 then
 .Sy bemgr\ umount\ foo
 would be equivalent to
-.Sy zfs\ unmount\ zroot/ROOT/foo Ns .
+.Sy zfs\ unmount\ zroot/ROOT/foo .
 .Pp
-On FreeBSD,
+On
+.Fx ,
 .Fl f
 causes the dataset to be unmounted even if it's busy.
 On Linux,
@@ -814,30 +823,36 @@ on Linux does not support forcefully unmounting datasets.
 does nothing special to support any specific boot managers.
 Rather, it will work with any boot manager which is designed to work with
 standard ZFS boot environments.
-On FreeBSD, it works with FreeBSD's normal boot manager.
+On
+.Fx , it works with
+.Fx Ns 's normal boot manager.
 On Linux, it works with zfsbootmenu.
 It's possible that it will work with other boot managers as well, but they need
 to work with no support from
-.Nm Ns .
+.Nm .
 .Pp
 .Sy rEFInd
 can be used in dual\-boot environments, since it will forward to other boot
-managers such as the FreeBSD boot manager, zfsbootmenu, or Windows' boot
+managers such as the
+.Fx
+boot manager, zfsbootmenu, or Windows' boot
 manager.
 .Sh SEE ALSO
-.Xr zfs 8
-.Xr zfsprops 7
+.Xr zfsprops 7 ,
+.Xr zfs 8 ,
 .Xr zpool 8
 .Sh HISTORY
 .Nm
 is modeled after
 .Xr bectl 8 and
-.Xr beadm 8 , which are great programs for managing boot environments on FreeBSD
+.Xr beadm 8 , which are great programs for managing boot environments on
+.Fx
 but do not support Linux.
 So,
 .Nm
 was written to have a similar solution on Linux but was made to work on both
-FreeBSD and Linux.
+.Fx
+and Linux.
 .Sh AUTHORS
 .Nm
 was written by
