@@ -55,10 +55,10 @@ changes to the OS (e.g. updating the packages which are installed or doing a
 major OS upgrade). That way, if something goes wrong, it's possible to restore
 the previous state of the OS by switching to the previous boot environment.
 
-`bemgr activate` is used to switch to a different boot environment the next
-time that the computer reboots (and boot managers will typically give the
-ability to manually select a boot environment other than the default to boot
-from).
+`bemgr activate` is used to set a different boot environment as the default so
+that it will be the active boot environment the next time that the computer
+reboots (and boot managers will typically give the ability to manually select a
+boot environment other than the default to boot from).
 
 `bemgr destroy` is used to remove boot environments.
 
@@ -74,6 +74,10 @@ location in order to access its files.
 `bemgr export` is used to export a boot environment to stdout.
 
 `bemgr import` is used to import a boot environment from stdin.
+
+# `bemgr` Commands
+
+See [usage](usage.md) for detailed information on each of the commands.
 
 # FreeBSD
 
@@ -113,10 +117,21 @@ used to load both zfsbootmenu and the boot loaders for other operating systems.
 be possible to use GRUB with bemgr, but GRUB is not designed around using ZFS
 boot environments, and it does not support recent ZFS features.
 
-# `bemgr` Commands
-
-See [usage](usage.md)
-
 # Building `bemgr`
 
 See [building](building.md)
+
+# Differences from `beadm` and `bectl`
+
+ The primary differences between `beadm` and `bectl` and bemgr are that
+
+ 1. `bemgr list` has the _Referenced_ and _If Last_ columns, whereas `beadm`
+    and `bectl` do not - though they have the `-D` flag which causes the
+    _Space_ column to be similar to _If Last_.
+
+ 2. `bemgr destroy` destroys origins by default and has `-n` do do a dry-run,
+    whereas beadm destroy asks before destroying origins, and bectl destroy
+    does not destroy origins by default. And neither `beadm destroy` nor
+    `bectl destroy` has way to do dry-runs.
+
+ 3. bemgr has no equivalent to `beadm chroot` or `bectl jail`.

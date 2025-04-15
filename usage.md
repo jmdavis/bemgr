@@ -2,8 +2,9 @@
 
 `bemgr activate <beName>`
 
-This sets the given boot environment as the one to boot the next time that the
-computer is rebooted.
+This sets the given boot environment as the default boot environment, so it
+will be the active boot environment the next time that the computer is
+rebooted.
 
 In more detail:
 
@@ -42,8 +43,8 @@ If `-e <beName>` is used, then the new BE is created by taking a snapshot of
 the BE provided to `-e` rather than the currently active BE. It is then cloned
 just like would have occurred if the snapshot had been from the current BE. For
 instance, `bemgr create -e foo bar` would create a snapshot of `zroot/ROOT/foo`
-and clone it to create `zroot/ROOT/bar` regardless of which BE was the active
-one.
+and clone it to create `zroot/ROOT/bar` regardless of which BE was currently
+active.
 
 If `-e <beName@snapshot>` is used, then instead of taking the snapshot of a BE
 and cloning it, the given snapshot is cloned. So, if `zroot/ROOT/foo` had the
@@ -51,11 +52,14 @@ snapshot `zroot/ROOT/foo@2025-04-02_update`,
 `bemgr -e foo@2025-04-02_update bar` would clone
 `zroot/ROOT/foo@2025-04-02_update` and create `zroot/ROOT/bar`.
 
-The newly created boot environment has its
+Regardless of what the newly created boot environment is a clone of, it has its
 [`canmount`](https://openzfs.github.io/openzfs-docs/man/master/7/zfsprops.7.html#canmount)
 property set to `noauto` and its
 [`mountpoint`](https://openzfs.github.io/openzfs-docs/man/master/7/zfsprops.7.html#mountpoint)
 property set to `/`.
+
+Note that the default boot environment remains unchanged. `bemgr activate`
+needs to be used to activate the new boot environment if that is desired.
 
 # bemgr create
 
@@ -85,22 +89,30 @@ nagging about stuff like whether the origin should be destroyed.
 
 `-k` tells `bemgr` to keep the origin in the case where the BE dataset is a
 clone; otherwise, it will be destroyed as long as it is not the origin of
-another dataset.
+another dataset. If the dataset is not a clone, then `-k` has no effect.
 
 Normally, if any of what's being destroyed is mounted, it will be unmounted and
 destroyed without a problem, but if it's actively in use, then zfs may refuse
-to unmount it. `-F` can be used to forcefully unmount what's being destroyed if
+to unmount it. `-F` can be used to forcibly unmount what's being destroyed if
 that occurs (or you can unmount it first). Of course, normally, inactive
 datasets are not mounted, and `bemgr` will refuse to destroy a dataset if it's
-active. So, `bemgr destroy` can't be used to destroy the currently running OS.
+active.  So, `bemgr` destroy can't be used to destroy the currently running OS.
 
-In more detail:
+However, note that on Linux, there are corner cases where `-F` will fail (e.g.
+if a snapshot affected by a promotion is currently mounted), because Linux
+apparently doesn't support forcibly unmounting things to the degree that
+FreeBSD does. `zfs destroy` is the only zfs command on Linux which supports
+forcibly unmounting. So, if `bemgr` needs to do any other commands which would
+require forcibly unmounting a dataset or snapshot, they are likely to fail on
+Linux even with `-F`.
+
+In more detail, what `bemgr destroy` does is:
 
 1. If any of the boot environment's snapshots are the origin of another dataset
    (i.e. a dataset is a clone of that snapshot), then a clone of the newest
-   snapshot which has a clone will be promoted, shifting that origin snapshot
-   and the other snapshots which are older than it to the clone that's
-   promoted, meaning that they will not be destroyed.
+   snapshot with a clone will be promoted, shifting that origin snapshot and
+   the other snapshots which are older than it to the clone that's promoted,
+   meaning that they will not be destroyed.
 
 2. If the boot environment has an origin (and thus is a clone), and that origin
    snapshot is not the origin of another dataset, then that origin snapshot will
@@ -266,10 +278,11 @@ property of the BE's dataset, which gives the date/time that the BE was created.
 
 `bemgr list -a [-H] [-s]`
 
-`bemgr -a` lists out the existing boot environments, sorted by their creation
-time, but it also lists out the dataset for each BE and the origin for each BE
-(if it has one). If `-s` is provided, then the snapshots are also listed (`-s`
-implies `-a`, so if it's used on its own, it's equivalent to `-as`).
+`bemgr list -a` lists out the existing boot environments, sorted by their
+creation time, but it also lists out the dataset for each BE and the origin for
+each BE (if it has one). If `-s` is provided, then the snapshots are also
+listed (`-s` implies `-a`, so if it's used on its own, it's equivalent to
+`-as`).
 
 `-H` is used for scripting. It replaces all of the spaces between columns with
 a single tab character. It also removes the column headers.
@@ -398,8 +411,8 @@ default
 ```
 
 The columns are basically the same as with `bemgr list` without `-a` except
-that there is no `If Last`. However, the column for names is obviously
-slightly different.
+that there is no `If Last`. However, the column for names is obviously somewhat
+different.
 
 In the case of
 ```
@@ -412,9 +425,19 @@ In the case of
 dataset for that BE, and `zroot/ROOT/default@2025-02-04-19:22:18` is the origin
 snapshot of that dataset. Since the dataset has no snapshots of its own, that's
 the entire list even with `-s`, whereas if it had additional snapshots, they'd
-be listed after the origin. For instance, if `2025-02-04_update` were
-activated (and thus its dataset was promoted, then its output from `bemgr list
--as` would become
+be listed after the origin. For instance, if it gained a `foo` and `bar` snapshot,
+then its output from `bemgr list -as` would look something like
+
+```
+2025-02-04_update
+  zroot/ROOT/2025-02-04_update                                -       -            955.4M      56.66G  2025-02-04 19:22:18
+    zroot/ROOT/default@2025-02-04-19:22:18                    -       -           955.39M      56.66G  2025-02-04 19:22:18
+  zroot/ROOT/2025-02-04_update@foo                            -       -                0B      56.66G  2025-04-15 19:38:05
+  zroot/ROOT/2025-02-04_update@bar                            -       -                0B      56.66G  2025-04-15 19:38:07
+```
+
+or if instead it were activated (and thus its dataset was promoted), then its
+output from `bemgr list -as` would look something like
 
 ```
 2025-02-04_update

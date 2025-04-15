@@ -21,7 +21,7 @@
 .\"FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
 .\"ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 .\"DEALINGS IN THE SOFTWARE.
-.Dd April 6, 2025
+.Dd April 15, 2025
 .Dt BEMGR 8
 .Os
 .Sh NAME
@@ -136,8 +136,7 @@ so that it does not get mounted automatically.
 The
 .Em bootfs
 property on the pool will then tell the boot manager which boot environment to
-mount as root by default (e.g.
-.Sy bootfs=zroot/ROOT/default Ns ).
+.No mount as root by default (e.g\&. Sy bootfs=zroot/ROOT/default Ns ).
 .Pp
 .Nm
 expects that boot environments will not have any child datasets.
@@ -162,9 +161,10 @@ That way, if something goes wrong, it's possible to restore the previous state
 of the OS by switching to the previous boot environment.
 .Pp
 .Sy bemgr\ activate
-is used to switch to a different boot environment the next time that the
-computer reboots (and boot managers will typically give the ability to manually
-select a boot environment other than the default to boot from).
+is used to set a different boot environment as the default so that it will be
+the active boot environment the next time that the computer reboots (and boot
+managers will typically give the ability to manually select a boot environment
+other than the default to boot from).
 .Sh COMMANDS
 .Bl -tag -width 0
 .It Xo
@@ -177,8 +177,9 @@ specific to that command.
 .Cm activate
 .Ar beName
 .Xc
-This sets the given boot environment as the one to boot the next time that the
-computer is rebooted.
+This sets the given boot environment as the default boot environment, so it
+will be the active boot environment the next time that the computer is
+rebooted.
 .Pp
 In more detail:
 .Bl -enum -width 1
@@ -239,7 +240,7 @@ would create a snapshot of
 .Pa zroot/ROOT/foo
 and clone it to create
 .Pa zroot/ROOT/bar
-regardless of which BE was the active one.
+regardless of which BE was currently active.
 .Pp
 If
 .Fl e
@@ -256,7 +257,7 @@ would clone
 and create
 .Pa zroot/ROOT/bar .
 .Pp
-The newly created boot environment has its
+Regardless of what the newly created boot environment is a clone of, it has its
 .Em canmount
 property set to
 .Em noauto
@@ -264,6 +265,10 @@ and its
 .Em mountpoint
 property set to
 .Pa / .
+.Pp
+Note that the default boot environment remains unchanged.
+.Sy bemgr\ activate
+needs to be used to activate the new boot environment if that is desired.
 .It Xo
 .Cm create
 .Ar beName@snapshot
@@ -295,7 +300,7 @@ other dataset has the same origin).
 .Fl n
 tells
 .Sy bemgr
-to do a dry\-run, so insted of actually destroying anything, it simply prints
+to do a dry\-run, so instead of actually destroying anything, it simply prints
 out what would have been promoted or destroyed if
 .Fl n
 hadn't been used.
@@ -314,12 +319,15 @@ tells
 .Nm
 to keep the origin in the case where the BE dataset is a clone; otherwise, it
 will be destroyed as long as it is not the origin of another dataset.
+If the dataset is not a clone, then
+.Fl k
+has no effect.
 .Pp
 Normally, if any of what's being destroyed is mounted, it will be unmounted and
 destroyed without a problem, but if it's actively in use, then zfs may refuse to
 unmount it.
 .Fl F
-can be used to forcefully unmount what's being destroyed if that occurs (or you
+can be used to forcibly unmount what's being destroyed if that occurs (or you
 can unmount it first). Of course, normally, inactive datasets are not mounted,
 and
 .Nm
@@ -328,14 +336,31 @@ So,
 .Sy bemgr\ destroy
 can't be used to destroy the currently running OS.
 .Pp
-In more detail:
+However, note that on Linux, there are corner cases where
+.Fl F
+will fail (e.g. if a snapshot affected by a promotion is currently mounted),
+because Linux apparently doesn't support forcibly unmounting things to the
+degree that
+.Fx
+does.
+.Sy zfs\ destroy
+is the only zfs command on Linux which supports forcibly unmounting.
+So, if
+.Nm
+needs to do any other commands which would require forcibly unmounting
+a dataset or snapshot, they are likely to fail on Linux even with
+.Fl F .
+.Pp
+In more detail, what
+.Sy bemgr destroy
+does is:
 .Bl -enum -width 1
 .It
 If any of the boot environment's snapshots are the origin of another dataset
 (i.e. a dataset is a clone of that snapshot), then a clone of the newest
-snapshot which has a clone will be promoted, shifting that origin snapshot and
-the other snapshots which are older than it to the clone that's promoted,
-meaning that they will not be destroyed.
+snapshot with a clone will be promoted, shifting that origin snapshot and the
+other snapshots which are older than it to the clone that's promoted, meaning
+that they will not be destroyed.
 .It
 If the boot environment has an origin (and thus is a clone), and that origin
 snapshot is not the origin of another dataset, then that origin snapshot will
@@ -385,7 +410,7 @@ Normally, if any of what's being destroyed is mounted, it will be unmounted and
 destroyed without a problem, but if it's actively in use, then zfs may refuse
 to unmount it.
 .Fl F
-can be used to forcefully unmount what's being destroyed if that occurs (or you
+can be used to forcibly unmount what's being destroyed if that occurs (or you
 can unmount it first).
 Of course, normally, snapshots are not mounted.
 .It Xo
@@ -559,7 +584,7 @@ property of the BE's dataset, which gives the date/time that the BE was created.
 .Op Fl H
 .Op Fl s
 .Xc
-.Sy bemgr\ \-a
+.Sy bemgr\ list\ \-a
 lists out the existing boot environments, sorted by their creation
 time, but it also lists out the dataset for each BE and the origin for each BE
 (if it has one).
@@ -708,7 +733,7 @@ without
 .Fl a
 except that there is no
 .Em If Last .
-However, the column for names is obviously slightly different.
+However, the column for names is obviously somewhat different.
 In the case of
 .Bd -literal
 2025\-02\-04_update
@@ -726,21 +751,35 @@ Since the dataset has no snapshots of
 its own, that's the entire list even with
 .Fl s ,
 whereas if it had additional snapshots, they'd be listed after the origin.
-For instance, if
-.Em 2025\-02\-04_update
-were activated (and thus its dataset was promoted), then its output from
-.Sy bemgr\ list\ \-as
-would become
+For instance, if it gained a
+.Pa foo
+and
+.Pa bar
+snapshot, then its output from
+.Sy bemgr\ list\ -as
+would look something like
 .Bd -literal
-2025\-02\-04_update
-  zroot/ROOT/2025\-02\-04_update                                \-       \-            70.02G      56.66G  2025\-02\-04 19:22:18
-  zroot/ROOT/2025\-02\-04_update@2024\-12\-15\-20:57:18            \-       \-           562.94M      53.81G  2024\-12\-15 20:57:18
-  zroot/ROOT/2025\-02\-04_update@2025\-01\-04\-02:48:02            \-       \-           737.46M      54.06G  2025\-01\-04 02:48:02
-  zroot/ROOT/2025\-02\-04_update@2025\-02\-04\-19:22:18            \-       \-                8K      56.66G  2025\-02\-04 19:22:18
+2025-02-04_update
+  zroot/ROOT/2025-02-04_update                                -       -            955.4M      56.66G  2025-02-04 19:22:18
+    zroot/ROOT/default@2025-02-04-19:22:18                    -       -           955.39M      56.66G  2025-02-04 19:22:18
+  zroot/ROOT/2025-02-04_update@foo                            -       -                0B      56.66G  2025-04-15 19:38:05
+  zroot/ROOT/2025-02-04_update@bar                            -       -                0B      56.66G  2025-04-15 19:38:07
+.Ed
+.Pp
+or if instead it were activated (and thus its dataset was promoted), then its
+output from
+.Sy bemgr\ list\ -as
+would look something like
+.Bd -literal
+2025-02-04_update
+  zroot/ROOT/2025-02-04_update                                -       -            70.02G      56.66G  2025-02-04 19:22:18
+  zroot/ROOT/2025-02-04_update@2024-12-15-20:57:18            -       -           562.94M      53.81G  2024-12-15 20:57:18
+  zroot/ROOT/2025-02-04_update@2025-01-04-02:48:02            -       -           737.46M      54.06G  2025-01-04 02:48:02
+  zroot/ROOT/2025-02-04_update@2025-02-04-19:22:18            -       -                8K      56.66G  2025-02-04 19:22:18
 .Ed
 .Pp
 since the origin snapshot and the snapshots older than it would be moved to
-.Pa zroot/ROOT/2025\-02\-04_update
+.Pa zroot/ROOT/2025-02-04_update
 when it's promoted.
 .It Xo
 .Cm mount
@@ -816,7 +855,7 @@ On Linux,
 .Fl f
 is not supported, because
 .Sy zfs\ umount
-on Linux does not support forcefully unmounting datasets.
+on Linux does not support forcibly unmounting datasets.
 .El
 .Sh Boot Managers
 .Nm
@@ -853,6 +892,46 @@ So,
 was written to have a similar solution on Linux but was made to work on both
 .Fx
 and Linux.
+.Pp
+The primary differences between
+.Xr beadm 8 and
+.Xr bectl 8 and
+.Nm
+are that
+.Bl -enum -width 1
+.It
+.Sy bemgr\ list
+has the
+.Em Referenced
+and
+.Em If Last
+columns, whereas the others do not - though they have the
+.Fl D
+flag which causes the
+.Em Space
+column to be similar to
+.Em If\ Last .
+.It
+.Sy bemgr\ destroy
+destroys origins by default and has
+.Fl n
+to do a dry-run, whereas
+.Sy beadm\ destroy
+asks before destroying origins, and
+.Sy bectl\ destroy
+does not destroy origins by default.
+Neither
+.Sy beadm\ destroy
+nor
+.Sy bectl\ destroy
+has a way to do dry-runs.
+.It
+.Nm
+has no equivalent to
+.Sy beadm\ chroot
+or
+.Sy bectl\ jail .
+.El
 .Sh AUTHORS
 .Nm
 was written by
