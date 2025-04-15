@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+INSTALL_DIR = $(CURDIR)/debian/bemgr/
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	dh_auto_clean
+
+	dub clean
+	rm -f bemgr.8.gz
+
+override_dh_auto_build:
+	dub build --build=release --compiler=ldc2
+	gzip -k bemgr.8
+
+override_dh_install:
+	dh_install
+
+	install -d $(INSTALL_DIR)/usr/sbin
+	cp bemgr $(INSTALL_DIR)/usr/sbin/
+
+	install -d $(INSTALL_DIR)/usr/share/man/man8
+	cp bemgr.8.gz $(INSTALL_DIR)/usr/share/man/man8/

@@ -1,0 +1,11 @@
+Source: bemgr
+Section: utils
+Maintainer: Jonathan M Davis <jmdavis@jmdavisprog.com>
+Priority: optional
+Build-Depends: debhelper-compat (= 13),dub,ldc
+Standards-Version: 4.6.2
+
+Package: bemgr
+Architecture: any
+Depends: ${shlibs:Depends},${misc:Depends},zfsutils-linux
+Description: Program to manage ZFS boot environments on FreeBSD and Linux.
