@@ -1,0 +1,35 @@
+# PKGBUILD file for bemgr.
+
+# Maintainer: Jonathan M Davis <jmdavis@jmdavisprog.com>
+
+pkgname=bemgr
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A program to manage ZFS boot environments on FreeBSD and Linux."
+arch=('any')
+url="https://github.com/jmdavis/bemgr"
+license=('BSL-1.0')
+depends=('glibc' 'gcc-libs' 'zfs')
+makedepends=('dub' 'ldc')
+source=("$pkgname-$pkgver.tar.xz")
+sha256sums=()
+
+build() {
+    cd "$pkgname-$pkgver"
+    dub clean
+    dub build --build=release --compiler=ldc2
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    install -d "$pkgdir/usr/bin"
+    cp bemgr "$pkgdir/usr/bin/"
+
+    gzip -k bemgr.8
+    install -d "$pkgdir/usr/share/man/man8"
+    cp bemgr.8.gz "$pkgdir/usr/share/man/man8/"
+
+    install -d "$pkgdir/usr/share/licenses/${pkgname}"
+    cp LICENSE_1_0.txt "$pkgdir/usr/share/licenses/${pkgname}/"
+}
