@@ -1910,3 +1910,16 @@ Dataset (and its Snapshots) to be Destroyed:
     assert(diff.missing.empty);
     assert(diff.extra.empty);
 }
+
+// Test bemgr destroy -k when there is no origin.
+unittest
+{
+    bemgr("export", "default | ../bemgr import foo");
+    assert(zfsGet("origin", "zroot/ROOT/foo") == "-");
+    bemgr("destroy -k", "foo");
+
+    checkActivated("default");
+    auto diff = diffNameList(startList, getCurrDSList());
+    assert(diff.missing.empty);
+    assert(diff.extra.empty);
+}
