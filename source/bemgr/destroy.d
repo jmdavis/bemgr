@@ -32,7 +32,9 @@ int doDestroy(string[] args)
      what would be promoted if -n were not used.
 
   -F will forcefully unmount the dataset and any of its snapshots which are
-     mounted. So, it will be unmounted even it is in use.
+     mounted. So, it will be unmounted even it is in use. However, note that
+     because Linux does not support forcibly unmounting to the same degree as
+     FreeBSD, -F may fail on Linux in some cases.
 
 bemgr destroy [-n] [-F] <beName@snapshot>
 

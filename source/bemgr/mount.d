@@ -68,9 +68,11 @@ bemgr unmount <beName>
 
   Unmounts the given inactive boot environment.
 
-  -f On FreeBSD, this will forcefully unmount the dataset.
-     It is not supported on Linux, because "zfs mount" does not support it on
-     Linux.`;
+  -f This will attempt to forcibly unmount the dataset. However, on Linux, it
+     does nothing, because "zfs umount" currently ignores -f on Linux. However,
+     because the flag is passed along to "zfs unmount", if "zfs unmount" starts
+     supporting -f on Linux, then "bemgr umount" should start working with -f
+     as well.`;
 
     import std.exception : enforce;
     import std.format : format;
@@ -84,19 +86,9 @@ bemgr unmount <beName>
     bool force;
     bool help;
 
-    version(FreeBSD)
-    {
-        getopt(args, config.bundling,
-               "f", &force,
-               "help", &help);
-    }
-    else version(linux)
-    {
-        getopt(args, config.bundling,
-               "help", &help);
-    }
-    else
-        static assert(false, "Unsupported OS");
+    getopt(args, config.bundling,
+           "f", &force,
+           "help", &help);
 
     if(help)
     {

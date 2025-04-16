@@ -866,12 +866,19 @@ would be equivalent to
 On
 .Fx ,
 .Fl f
-causes the dataset to be unmounted even if it's busy.
-On Linux,
+attempts to unmount the dataset even if it's busy.
+However, on Linux,
 .Fl f
-is not supported, because
-.Sy zfs\ umount
+currently does nothing, because
+.Sy zfs\ unmount
 on Linux does not support forcibly unmounting datasets.
+.Fl f
+is passed along to
+.Sy zfs\ unmount ,
+so if it starts supporting it on Linux at some point in the future, then
+.Sy bemgr\ umount
+should start supporting it on Linux as well, but of course, that may never
+happen.
 .El
 .Sh Boot Managers
 .Nm

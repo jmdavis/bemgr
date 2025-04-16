@@ -1181,30 +1181,14 @@ unittest
     bemgr("umount", "foo");
     check(false);
 
-    version(FreeBSD)
-    {
-        bemgr("mount", format!"foo %s"(esfn(mnt)));
-        check(true);
-        bemgr("umount", "-f foo");
-        check(false);
-        bemgr("mount", format!"foo %s"(esfn(mnt)));
-        check(true);
-        bemgr("unmount", "-f foo");
-        check(false);
-    }
-    else version(linux)
-    {
-        bemgr("mount", format!"foo %s"(esfn(mnt)));
-        check(true);
-        assertThrown(bemgr("umount", "-f foo"));
-        check(true);
-        assertThrown(bemgr("unmount", "-f foo"));
-        check(true);
-        bemgr("unmount", "foo");
-        check(false);
-    }
-    else
-        static assert(false, "Unsupported OS");
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    check(true);
+    bemgr("umount", "-f foo");
+    check(false);
+    bemgr("mount", format!"foo %s"(esfn(mnt)));
+    check(true);
+    bemgr("unmount", "-f foo");
+    check(false);
 
     assert(!exists("/foobar_sally"));
     assertThrown(bemgr("mount", "foo /foobar_sally"));

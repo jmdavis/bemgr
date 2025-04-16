@@ -501,3 +501,10 @@ For instance, if the parent dataset of the BEs is `zroot/ROOT`, then
 On FreeBSD, `-f` causes the dataset to be unmounted even if it's busy. On
 Linux, `-f` is not supported, because `zfs umount` on Linux does not support
 forcefully unmounting datasets.
+
+On FreeBSD, `-f` attempts to unmount the dataset even if it's busy. However, on
+Linux, `-f` currently does nothing, because `zfs unmount` on Linux does not
+support forcibly unmounting datasets. `-f` is passed along to `zfs unmount`, so
+if it starts supporting it on Linux at some point in the future, then `bemgr
+umount` should start supporting it on Linux as well, but of course, that may
+never happen.
