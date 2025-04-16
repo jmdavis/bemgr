@@ -1571,6 +1571,49 @@ unittest
         assert(diff.missing.empty);
         assert(diff.extra.empty);
     }
+    {
+        bemgr("create", "default@foo");
+        mountWithoutZFS("zroot/ROOT/default@foo", mnt);
+        assert(buildPath(mnt, "bin").exists);
+        checkActivated("default");
+
+        // It seems that FreeBSD isn't inclined to complain about the device
+        // being busy if the snapshot is mounted, but Linux is.
+        version(FreeBSD)
+        {
+            bemgr("destroy", "-F default@foo");
+            assert(!buildPath(mnt, "bin").exists);
+        }
+        else version(linux)
+        {
+            assertThrown(bemgr("destroy", "default@foo"));
+            assert(buildPath(mnt, "bin").exists);
+            runCmd(format!"umount %s"(mnt));
+            assert(!buildPath(mnt, "bin").exists);
+            runCmd(format!"zfs destroy zroot/ROOT/default@foo");
+        }
+        else
+            static assert(false, "Unsupported OS");
+
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
+    {
+        bemgr("create", "default@foo");
+        mountWithoutZFS("zroot/ROOT/default@foo", mnt);
+        assert(buildPath(mnt, "bin").exists);
+        checkActivated("default");
+
+        bemgr("destroy", "-F default@foo");
+        assert(!buildPath(mnt, "bin").exists);
+
+        checkActivated("default");
+        auto diff = diffNameList(startList, getCurrDSList());
+        assert(diff.missing.empty);
+        assert(diff.extra.empty);
+    }
 }
 
 // Test rename with a mounted snapshot

@@ -102,9 +102,9 @@ However, note that on Linux, there are corner cases where `-F` will fail (e.g.
 if a snapshot affected by a promotion is currently mounted), because Linux
 apparently doesn't support forcibly unmounting things to the degree that
 FreeBSD does. `zfs destroy` is the only zfs command on Linux which supports
-forcibly unmounting. So, if `bemgr` needs to do any other commands which would
-require forcibly unmounting a dataset or snapshot, they are likely to fail on
-Linux even with `-F`.
+forcibly unmounting, and it does not support it for snapshots. So, if `bemgr`
+needs to do any other commands which would require forcibly unmounting a
+dataset or snapshot, they are likely to fail on Linux even with `-F`.
 
 In more detail, what `bemgr destroy` does is:
 
@@ -146,6 +146,12 @@ destroyed without a problem, but if it's actively in use, then zfs may refuse
 to unmount it. `-F` can be used to forcefully unmount what's being destroyed if
 that occurs (or you can unmount it first). Of course, normally, snapshots are
 not mounted.
+
+Note however that `-F` will not always work on Linux, because `-f` for
+`zfs destroy` does not forcibly unmount snapshots, and `zfs unmount` does not
+support `-f` on Linux. If the snapshot is mounted, `bemgr` will attempt to
+unmount it before destroying it so that it can be destroyed, but it can't
+forcibly unmount it.
 
 # bemgr export
 

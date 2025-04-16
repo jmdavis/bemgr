@@ -338,13 +338,13 @@ can't be used to destroy the currently running OS.
 .Pp
 However, note that on Linux, there are corner cases where
 .Fl F
-will fail (e.g. if a snapshot affected by a promotion is currently mounted),
-because Linux apparently doesn't support forcibly unmounting things to the
-degree that
+will fail, because Linux apparently doesn't support forcibly unmounting things
+to the degree that
 .Fx
 does.
 .Sy zfs\ destroy
-is the only zfs command on Linux which supports forcibly unmounting.
+is the only zfs command on Linux which supports forcibly unmounting, and it
+does not support it for snapshots.
 So, if
 .Nm
 needs to do any other commands which would require forcibly unmounting
@@ -413,6 +413,22 @@ to unmount it.
 can be used to forcibly unmount what's being destroyed if that occurs (or you
 can unmount it first).
 Of course, normally, snapshots are not mounted.
+.Pp
+Note however that
+.Fl F
+will not always work on Linux, because
+.Fl f
+for
+.Sy zfs\ destroy
+does not forcibly unmount snapshots, and
+.Sy zfs\ unmount
+does not support
+.Fl f
+on Linux.
+If the snapshot is mounted,
+.Nm
+will attempt to unmount it before destroying it so that it can be destroyed, but
+it can't forcibly unmount it.
 .It Xo
 .Cm export
 .Op Fl k

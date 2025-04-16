@@ -95,7 +95,11 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         if(dryRun)
             writefln("Snapshot to destroy: %s", snapName);
         else
-            runCmd(format!"zfs destroy%s %s"(force ? " -f" : "", esfn(snapName)));
+        {
+            if(force && !executeShell(format!"mount | grep %s"(esfn(snapName))).output.empty)
+                runCmd(format!"umount -f %s"(esfn(snapName)));
+            runCmd(format!"zfs destroy %s"(esfn(snapName)));
+        }
 
         return 0;
     }
@@ -152,7 +156,7 @@ bemgr destroy [-n] [-F] <beName@snapshot>
         if(destroyOrigin)
         {
             if(force && !executeShell(format!"mount | grep %s"(esfn(origin))).output.empty)
-                runCmd(format!"umount %s"(esfn(origin)));
+                runCmd(format!"umount -f %s"(esfn(origin)));
             runCmd(format!"zfs destroy %s"(esfn(origin)));
         }
     }
