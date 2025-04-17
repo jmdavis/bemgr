@@ -2,10 +2,10 @@ https://wiki.debian.org/Packaging/Intro
 https://www.debian.org/doc/manuals/maint-guide/dreq.en.html
 
 For future releases, some stuff (like the changelog) will probably have to be
-updated, but to build 1.0.0, copy bemgr-1.0.0.tar.xz from the release into this
+updated, but to build 1.0.0, copy bemgr-1.0.0.tar.gz from the release into this
 directory, then run
 
-$ mv bemgr-1.0.0.tar.xz bemgr_1.0.0.orig.tar.gz
+$ mv bemgr-1.0.0.tar.gz bemgr_1.0.0.orig.tar.gz
 $ tar xvf bemgr_1.0.0.orig.tar.gz
 $ cp -a debian bemgr-1.0.0/
 $ cd bemgr-1.0.0
