@@ -36,9 +36,15 @@ To build with ldc specifically, run
 
 `dub build --build=release --compiler=ldc2`
 
-Alternatively, the `install.sh` script can be used. It will do a clean build
-with `ldc` if it's installed and `dmd` otherwise, and then it will copy `bemgr`
-to `/usr/local/sbin` and its man page to `/usr/local/share/man/man8`.
+Alternatively, the `install.sh` script can be used. It takes an install prefix, e.g.
+
+`./install.sh /usr/local`
+
+It will do a clean build with `ldc` if it's installed and `dmd` otherwise, and
+then it will copy `bemgr` to `sbin` and its man page to `share/man/man8` within
+the given install prefix. It will use sudo when copying the files if it
+determines that the user running the script doesn't have write permissions to
+the prefix; otherwise, it will copy them without sudo.
 
 # Testing
 
