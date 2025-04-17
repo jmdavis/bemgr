@@ -14,7 +14,7 @@ license=('BSL-1.0')
 depends=('glibc' 'gcc-libs' 'zfs' "zlib")
 makedepends=('dub' 'ldc')
 #source=("$pkgname-$pkgver.tar.gz")
-source=("$pkgname-$pkgver.tar.gz::https://github.com/jmdavis/$pkgname/archive/refs/tags/"$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/jmdavis/bemgr/archive/refs/tags/v1.0.0.tar.gz")
 sha256sums=(c0c876b740aa020a059a6629c394778420f914faa53dbcff45dc670a18263a3d)
 
 build() {
