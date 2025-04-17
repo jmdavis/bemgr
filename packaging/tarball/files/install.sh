@@ -21,9 +21,14 @@ else
     SUDO="sudo "
 fi
 
-echo ${SUDO}cp -Rv sbin $PREFIX/
-${SUDO}cp -Rv sbin $PREFIX/
-echo ""
+echo ${SUDO}mkdir -p "$PREFIX/sbin"
+${SUDO}mkdir -p "$PREFIX/sbin" || exit 1
 
-echo ${SUDO}cp -Rv share $PREFIX/
-${SUDO}cp -Rv share $PREFIX/
+echo ${SUDO}cp sbin/bemgr "$PREFIX/sbin/"
+${SUDO}cp sbin/bemgr "$PREFIX/sbin/" || exit 1
+
+echo ${SUDO}mkdir -p "$PREFIX/share/man/man8/"
+${SUDO}mkdir -p "$PREFIX/share/man/man8/" || exit 1
+
+echo ${SUDO}cp share/man/man8/bemgr.8.gz "$PREFIX/share/man/man8/"
+${SUDO}cp share/man/man8/bemgr.8.gz "$PREFIX/share/man/man8/" || exit 1
