@@ -2,7 +2,7 @@ Source: bemgr
 Section: utils
 Maintainer: Jonathan M Davis <jmdavis@jmdavisprog.com>
 Priority: optional
-Build-Depends: debhelper-compat (= 13),dub,ldc
+Build-Depends: debhelper-compat (= 13),dub,ldc,zlib1g
 Standards-Version: 4.6.2
 
 Package: bemgr

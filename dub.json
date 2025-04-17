@@ -3,5 +3,8 @@
     "description": "A program to manage ZFS boot environments on FreeBSD and Linux.",
     "copyright": "Copyright © 2025, Jonathan M Davis",
     "authors": [ "Jonathan M Davis" ],
-    "license": "BSL-1.0"
+    "license": "BSL-1.0",
+    "dflags-dmd": ["-defaultlib=:libphobos2.a"],
+    "dflags-ldc": ["-link-defaultlib-shared=false"],
+    "lflags-ldc": ["-lz"]
 }
