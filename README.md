@@ -132,6 +132,6 @@ See [building](building.md)
  2. `bemgr destroy` destroys origins by default and has `-n` do do a dry-run,
     whereas beadm destroy asks before destroying origins, and bectl destroy
     does not destroy origins by default. And neither `beadm destroy` nor
-    `bectl destroy` has way to do dry-runs.
+    `bectl destroy` has a way to do dry-runs.
 
  3. bemgr has no equivalent to `beadm chroot` or `bectl jail`.
