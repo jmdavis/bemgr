@@ -3,7 +3,7 @@
 # Maintainer: Jonathan M Davis <jmdavis@jmdavisprog.com>
 
 pkgname=bemgr
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="A program to manage ZFS boot environments on FreeBSD and Linux."
 # In theory, this should also work on x86 and ARM, but it has not been tested
@@ -14,8 +14,8 @@ license=('BSL-1.0')
 depends=('glibc' 'gcc-libs' 'zfs' "zlib")
 makedepends=('dub' 'ldc')
 #source=("$pkgname-$pkgver.tar.gz")
-source=("$pkgname-$pkgver.tar.gz::https://github.com/jmdavis/bemgr/archive/refs/tags/v1.0.0.tar.gz")
-sha256sums=(c0c876b740aa020a059a6629c394778420f914faa53dbcff45dc670a18263a3d)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/jmdavis/bemgr/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=(2cc2232dbaa0a65dd6a8ee01bbbda2042e3a1b9c98c45311421eb91ce82770b2)
 
 build() {
     cd "$pkgname-$pkgver"
