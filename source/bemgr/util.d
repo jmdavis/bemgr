@@ -338,7 +338,7 @@ string createSnapshotWithTime(string dataset)
     import std.format : format;
     import std.process : esfn = escapeShellFileName;
 
-    immutable snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeWithOffset());
+    immutable snapName = format!"%s@bemgr_%s"(dataset, getCurrTimeAsString());
 
     runCmd(format!"zfs snap %s"(esfn(snapName)));
 
@@ -372,7 +372,7 @@ void promote(string dataset)
 
 private:
 
-string getCurrTimeWithOffset()
+string getCurrTimeAsString()
 {
     import core.time : abs, Duration;
     import std.datetime.date : DateTime;
@@ -388,7 +388,7 @@ string getCurrTimeWithOffset()
     int minutes;
     absOffset.split!("hours", "minutes")(hours, minutes);
 
-    return format!"%s.%03d%s%02d:%02d"(dt.toISOExtString(), st.fracSecs.total!"msecs", offset < Duration.zero ? "-" : "+", hours, minutes);
+    return format!"%s.%03d"(dt.toISOExtString(), st.fracSecs.total!"msecs");
 }
 
 struct Mountpoint
