@@ -1,0 +1,6 @@
+Ddoc
+
+$(MAN_PAGE)
+
+Macros:
+    TITLE=Man Page for $(PROJECT_NAME)

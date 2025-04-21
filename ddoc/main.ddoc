@@ -1,0 +1,27 @@
+_=Main entry point
+
+DDOC =
+<!DOCTYPE html>
+$(T html,
+    $(T head,
+        <META http-equiv="content-type" content="text/html; charset=utf-8">
+        <link rel="stylesheet" type="text/css" href="css/proj_docs.css">
+        $(T title, $(TITLE))
+        $(EXTRA_HEADERS)
+        $(EXTRA_HEADERS2)
+    )
+    $(T body,
+        $(LAYOUT_PREFIX)
+        $(DIVC container,
+            $(DIVC content,
+                $(BODY_PREFIX)
+                $(BODY)
+                $(BODY_POSTFIX)
+            )
+        )
+        $(EXTRA_FOOTERS)
+        $(LAYOUT_SUFFIX)
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+     )
+)
+_=
