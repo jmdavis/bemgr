@@ -21,7 +21,7 @@
 .\"FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
 .\"ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 .\"DEALINGS IN THE SOFTWARE.
-.Dd April 15, 2025
+.Dd May 4, 2025
 .Dt BEMGR 8
 .Os
 .Sh NAME
@@ -935,8 +935,23 @@ flag which causes the
 column to be similar to
 .Em If\ Last .
 .It
+.Sy bemgr\ list
+and
+.Sy beadm\ list
+both list the BEs sorted by their creation times, whereas
+.Sy bectl list
+sorts them by their names by default.
+However,
+.Sy bectl\ list
+does have a flag to specify the property to sort the list by,
+whereas
+.Sy bemgr\ list
+and
+.Sy beadm\ list
+do not.
+.It
 .Sy bemgr\ destroy
-destroys origins by default and has
+destroys origins without asking for confirmation, but it has
 .Fl n
 to do a dry-run, whereas
 .Sy beadm\ destroy
