@@ -123,15 +123,71 @@ See [building](building.md)
 
 # Differences from `beadm` and `bectl`
 
- The primary differences between `beadm` and `bectl` and bemgr are that
+The primary differences between `beadm` and `bectl` and `bemgr` are that
 
- 1. `bemgr list` has the _Referenced_ and _If Last_ columns, whereas `beadm`
-    and `bectl` do not - though they have the `-D` flag which causes the
-    _Space_ column to be similar to _If Last_.
+1. `bemgr list` has the _Referenced_ and _If Last_ columns, whereas `beadm` and
+   `bectl` do not - though they have the `-D` flag which causes the _Space_
+   column to be similar to _If Last_.
 
- 2. `bemgr destroy` destroys origins by default and has `-n` do do a dry-run,
-    whereas beadm destroy asks before destroying origins, and bectl destroy
-    does not destroy origins by default. And neither `beadm destroy` nor
-    `bectl destroy` has a way to do dry-runs.
+2. `bemgr list` and `beadm list` both list the BEs sorted by their creation
+   times, whereas `bectl list` sorts them by their names by default. However,
+   `bectl list` does have a flag to specify the property to sort the list by,
+   whereas `bemgr list` and `beadm list` do not.
 
- 3. bemgr has no equivalent to `beadm chroot` or `bectl jail`.
+3. `bemgr destroy` destroys origins without asking for confirmation, but it has
+   `-n` to do a dry-run, whereas `beadm destroy` asks before destroying
+   origins, and `bectl destroy` does not destroy origins by default. And
+   neither `beadm destroy` nor `bectl destroy` has a way to do dry-runs.
+
+4. bemgr has no equivalent to `beadm chroot` or `bectl jail`.
+
+# Differences from `zectl`
+
+`zectl` is a Linux-only solution which provides similar functionality to
+`beadm` and `bectl`. However, it differs from them more than `bemgr` does
+(which may be good or bad depending on your preferences or use cases). Some of
+the differences between `zectl` and `bemgr` are
+
+1. `zectl` has a way to provide plugins to support bootloaders. At present,
+   it only provides a plugin for systemdboot, but that means that it supports
+   both zfsbootmenu (since zfsbootmenu doesn't require special support)
+   and systemdboot, whereas `bemgr` only supports zfsbootmenu.
+
+2. `zectl get` and `zectl set` allow `zectl` to get and set properties specific
+   to `zectl` on the parent dataset of the BEs (e.g. related to the bootloader
+   plugin you want to use). `bemgr` has no comparable functionality, but it
+   also doesn't have any zfs properties specific to it that it would need to
+   get or set.
+
+3. `zectl list` only has the _Name_, _Active_, _Mountpoint_, and _Creation_
+   columns. It provides no information about space utilization.
+
+4. `zectl list` lists the BEs sorted by their names, whereas `bemgr list` lists
+   them sorted by their creation times.
+
+5. `zectl list` does not provide either the `-a` or `-s` flags and provides no
+   way to list snapshots or the origins of BEs which are clones.
+
+6. `zectl create` cannot create snapshots. However, `zectl snapshot` provides
+   that functionality.
+
+7. Like `bemgr destroy`, `zectl destroy` destroys origins without asking for
+   confirmation, but it does not have a flag to do a dry-run, so you can't see
+   what it's going to destroy first.
+
+8. `zectl destroy` does not appear to attempt to promote clones in order to
+   make it possible to destroy boot environments which have snapshots which are
+   the origin of another BE (or of any other dataset). It will succeed at
+   destroying a BE when it cannot destroy its origin (e.g. because another BE
+   has the same origin), but it reports that it's failed.
+
+   So, `zectl destroy` should work just fine in the typical case where you
+   create a new BE from the current one when upgrading and then later destroy
+   it, but if you're creating a lot of snapshots of BEs and creating other BEs
+   from those snapshots, you're probably going to run into cases where it
+   fails, whereas `bemgr destroy` attempts to promote clones where necessary so
+   that the destruction can succeed. Of course, that doesn't mean that there
+   aren't any corner cases where `bemgr destroy` will fail, but it seems to
+   handle many more than `zectl destroy` does.
+
+9. `zectl` has no `import` or `export` commands.
