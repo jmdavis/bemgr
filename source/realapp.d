@@ -31,7 +31,6 @@ int realMain(string[] args)
 Use --help on individual commands for more information.`;
 
     import std.exception : enforce;
-    import std.getopt : GetOptException;
     import std.stdio : stderr, writeln;
 
     import bemgr.create : doCreate, doRename;
